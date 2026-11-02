@@ -1,5 +1,12 @@
 # Capri for Minecraft
 
+
+For custom Addons or commissions add me on discord @.tob1s
+
+Also check out AdemDEV For commissions!
+https://github.com/AdemonG1tHub
+
+
 [![downloads](https://img.shields.io/github/downloads/tob7as/Minecraft-with-Capri-/total?label=downloads)](https://github.com/tob7as/Minecraft-with-Capri-/releases/latest)
 
 **[⬇️ Download](#️-download) · [✨ What Capri X adds](#what-capri-x-adds) · [🎬 See her in action](#see-her-in-action) · [🛠️ Setup](#setup) · [💬 Suggestions](#suggestions)**
