@@ -1,5 +1,5 @@
 # Capri for Minecraft
-
+For the newer Capri download it from [Lachy's Capri](https://github.com/lachydotmcg/capri-desktop) (will not work with bedrock addon)
 
 For custom Addons or commissions add me on discord @.tob1s
 
