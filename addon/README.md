@@ -84,6 +84,11 @@ When a monster is 4–13 blocks away, she breaks into pink and green fragments (
 
 When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them: green static, floating question marks and a glitched note-block tune, and they spin and stagger about with Slowness and Weakness for 4 seconds. "Oops! I unplugged their braincells!" Bedrock's scripting can't wipe a mob's target, so this works by making them spin and wander rather than truly forgetting you.
 
+### New in 1.7.9
+- **Netrunner armour set**, modelled in Blockbench: a big hood lined with glowing cyan circuit glyphs and outlined in neon, a V-collar coat, a glowing ribcage chest plate with a bright core, chunky shoulder pads with blue and purple lights, neon tubes that curve off the shoulders and down the arms, and teal glyph gauntlets (Netrunner Hoodie, 8 armour); dark pants with teal chevron knee pads, neon side stripes and purple thigh lights (Netrunner Pants, 6); plated boots with glowing cyan-and-magenta soles and a neon cuff (Netrunner Boots, 3). Netherite-grade, enchantable, repaired with diamonds or netherite scrap.
+- **Only Kaz sells**: chrome, Capri upgrades, build plans and gear can only be bought from Kaz the ripperdoc, in person (within 8 blocks). The Mainframe BUILD page still starts your builds but points you to Kaz for plans, and the CYBERWARE page's buy button now calls him over.
+- Buy it from Kaz: his clinic has a new **STREET GEAR** page (hoodie 600 €$, pants 450, boots 300, or the full set for 1200). It goes straight into your inventory, or drops at your feet if your bag is full.
+
 ### New in 1.7.8
 - **CREW board** (Mainframe > CREW, or `/capri crew`): a dossier on everyone in the world: online or when they were last seen, their eddies, gigs done, last death and nickname. Buttons for everything below.
 - **Reboot Optics** quickhack: a friend's screen goes dark with static for 3 seconds. `/capri optics <player>` (45 s cooldown, never yourself).
@@ -92,7 +97,7 @@ When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them:
 - **Holocall**: "Capri, tell Sam to come to my base". The message pops up on their screen with a holo-call sound (and their Capri reads it out if they have the mod). `/capri holocall "sam come to my base"`, or `everyone` for the whole crew.
 - **Send eddies**: pay a friend from the CREW board or with `/capri pay "sam 50"`.
 - **Nicknames and greetings**: Capri says hi when someone joins, using their nickname. Set one with `/capri nickname "sam the legend"`, or let her give them one: die to creepers three times and you're "the creeper magnet". Others: gravity's favourite, the fish, the human torch, the pincushion, the gig machine, the walking ATM...
-- **Underground Base** (700 €$, first on the BUILD page and Kaz's BUILD PLANS): a neon doorway, steps down into the ground, a 13 x 11 hall with neon in the ceiling, and a vault at the back. She digs it out herself and brings every block. She never digs out chests, spawners, bedrock or portals.
+- **Underground Base** (700 €$, first in Kaz's BUILD PLANS): a neon doorway, steps down into the ground, a 13 x 11 hall with neon in the ceiling, and a vault at the back. She digs it out herself and brings every block. She never digs out chests, spawners, bedrock or portals.
 - **X-ray ore scan**: after a scan, every ore she found (the 40 nearest) gets a coloured tag like **◆ DIAMOND** or **◆ GOLD** that shows through the stone for 15 seconds.
 - **Pick where builds go**: builds and the 7x7 clear go on the block you look at, up to 48 blocks away. Look at the sky and they go in front of you like before.
 - **Don't hit Capri**: if a friend hits her, she gets mad, yells at them, shoves them back and tells you. Three hits in a minute and their optics get rebooted. If you hit her, she's just hurt.
@@ -114,7 +119,7 @@ When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them:
 - **Courier gigs**: travel 1000 or 3000 blocks, on foot, by boat, horse or elytra (teleports don't count).
 - **Max-Tac bounties**: rare, big-money gigs: a ravager, an elder guardian, the Warden, the Wither, the Ender Dragon.
 - **Skip a gig** for 10 €$, from the GIGS page or a gig's own card. Mine gigs now count any block you break.
-- **BUILD page** (Mainframe > BUILD, or Kaz > BUILD PLANS): the free builds plus four plans you buy with eddies: **Neon Tower** (900, four floors, glass walls, neon bands, a sign and an antenna), **Netrunner Safehouse** (400), **AV Landing Pad** (300) and **Neon Gate** (250). They bring their own materials (see 1.7.5).
+- **BUILD page** (Mainframe > BUILD starts your builds; the plans are bought only from Kaz > BUILD PLANS): the free builds plus four plans you buy with eddies: **Neon Tower** (900, four floors, glass walls, neon bands, a sign and an antenna), **Netrunner Safehouse** (400), **AV Landing Pad** (300) and **Neon Gate** (250). They bring their own materials (see 1.7.5).
 - **Capri Bedrock mod**: she calls out danger (creepers, swarms, low health), greets friends who join (and remembers them), and holds a grudge against whatever killed you until you take it down. Ask her "who do you have a grudge against?" or "who are my friends?".
 
 ### New in 1.7.3

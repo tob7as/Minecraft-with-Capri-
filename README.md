@@ -69,6 +69,8 @@ Code mods are Windows only for now. Port 19131 busy? Change it in `settings.txt`
 - **Builds:** a hut, house, tower, bridge, wall and more from her backpack, plus paid plans that bring their own materials: **Neon Gate**, **AV Landing Pad**, **Netrunner Safehouse**, **Neon Tower** and the new **Underground Base** she digs into the ground. Builds go wherever you look.
 - **Your crew:** a CREW board with everyone's eddies, gigs and last death, holocalls ("Capri, tell Sam to come to my base"), sending eddies, nicknames she greets friends with, and pranks: Reboot Optics, the eddie skim (opt-in) and a jealous Capri. Hit her and she gets mad.
 - **X-ray ore scan:** every ore she finds shows through the stone for 15 seconds.
+- **Netrunner armour:** a hooded neon coat with a glowing circuit-lined hood, ribcage chest light, lit shoulder pads and neon arm tubes, plus matching pants and boots with glowing soles. Sold by Kaz under STREET GEAR.
+- **Only Kaz sells:** chrome, upgrades, build plans and gear are bought from the ripperdoc in person.
 - **Cyberpsychosis:** too much chrome and your screen starts to glitch. Kaz sells immunosuppressants.
 - **With the mod:** she says her game lines out loud, calls out danger (creepers, swarms, low health), greets your friends when they join, and holds a grudge against whatever killed you until you take it down.
 
