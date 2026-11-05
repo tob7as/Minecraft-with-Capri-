@@ -35,9 +35,9 @@ Click a button and the download starts. The add-on works on its own: the mod and
 ### 1. The add-on
 
 1. Double-click **Capri_Companion_v1.7.5.mcaddon**. Minecraft opens and imports both packs.
-2. Make or edit a world. Under **Behavior Packs** nad Resource packs, turn on **Capri Companion**. The resource pack comes with it.
-4. Join the world. You get **Capri's chip**. Use it to open her Mainframe, then press **Summon** (or type `/capri summon`).
-5. `/capri help` lists everything she can do. Tap her to make her stay or follow, sneak and tap her for her job menu.
+2. Make or edit a world. Under **Behavior Packs** and **Resource Packs**, turn on **Capri Companion**. The resource pack comes with it.
+3. Join the world. You get **Capri's chip**. Use it to open her Mainframe, then press **Summon** (or type `/capri summon`).
+4. `/capri help` lists everything she can do. Tap her to make her stay or follow, sneak and tap her for her job menu.
 
 Needs Minecraft Bedrock 1.26.50 or newer. `/capri` works without cheats.
 
