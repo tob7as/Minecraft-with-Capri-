@@ -49,7 +49,7 @@ Needs Minecraft Bedrock 1.26.50 or newer. `/capri` works without cheats.
 4. Press **Import mod** and pick the `capri-bedrock.capri-code` file you downloaded.
 5. It's a code mod, so Capri asks before it runs. Say **yes**. It then shows under **INSTALLED** as **Capri Bedrock**: make sure its button says **On**.
 
-   <img src="images/mods-page.png" alt="Capri's Mods page: press Import mod at the top, then Capri Bedrock shows under INSTALLED with its On button" width="300">
+   <img src="images/capri-mods-import.png" alt="Capri's Mods page: press Import mod at the top, then Capri Bedrock shows under INSTALLED with its On button" width="300">
 
 6. In Minecraft, turn on **cheats** for the world and type in chat:
    ```
