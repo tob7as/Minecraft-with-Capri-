@@ -1,0 +1,1047 @@
+// capri-mod: 1
+// id: capri-bedrock
+// name: Capri Bedrock
+// version: 1.0.0
+// author: tob7as
+// description: Plays Minecraft Bedrock with you through the Capri Companion add-on. In game, type /connect localhost:19131.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using CapriDesktop;
+
+// Bedrock's /connect talks to a websocket server. This mod hosts one on this PC (port 19131 unless settings.txt says
+// otherwise), hears game chat and events, reads the add-on's "/capri feed" about once a second, and sends her jobs to her
+// body in the game as "scriptevent capri:<job>". What you say or type to her is checked here first: a Minecraft order is
+// sent and answered with a quick line, anything else goes to her brain as usual. Her in-game lines wait for you: never
+// within a few seconds of you talking, one at a time, and Capri herself holds a line until you've finished.
+public class CapriBedrock : ICapriMod
+{
+    private const int DefaultPort = 19131;
+    private static readonly string[] Events = { "PlayerMessage", "PlayerDied", "MobKilled" };
+    private static readonly string[] TalkNames = { "never", "sometimes", "a lot" };
+
+    private ICapriHost capri;
+    private string settingsFile, memoryFile;
+    private int port = DefaultPort;
+    private int talk = 2;                 // how much she talks about the game on her own: 0 never, 1 sometimes, 2 a lot
+
+    private volatile int run;
+    private volatile int hosted;
+    private TcpListener listener;
+    private readonly object sending = new object();
+    private Func<string, bool> send;
+    private readonly Dictionary<string, Action<Dictionary<string, object>>> waiting = new Dictionary<string, Action<Dictionary<string, object>>>();
+    private DateTime lastFeed = DateTime.MinValue;
+    private string status = "Starting...";
+
+    private readonly object gate = new object();
+    private readonly Stopwatch clock = Stopwatch.StartNew();
+    private readonly Random random = new Random();
+    private Dictionary<string, object> mcState;
+    private double sentAt = -1000, spokeAt = -1000, spokeUntil = -1000, progressAt = -1000, pendingAt, userAt = -1000, narratedAt = -1000, reactedAt = -1000;
+    private string pending;
+    private string lastMode = "";
+
+    private double Now { get { return clock.Elapsed.TotalSeconds; } }
+    private bool Connected { get { return send != null; } }
+    // True while the add-on answers the feed: then her body says its own lines in chat, so the mod doesn't repeat them there.
+    private bool FeedLive { get { return send != null && (DateTime.UtcNow - lastFeed).TotalSeconds < 5; } }
+
+    // ---------------------------------------------------------------- the mod
+    public void Start(ICapriHost host)
+    {
+        capri = host;
+        settingsFile = Path.Combine(host.Folder, "settings.txt");
+        memoryFile = Path.Combine(host.Folder, "memory.txt");
+        ReadSettings();
+        ReadMemory();
+        int mine = ++run;
+        Thread worker = new Thread(delegate() { Host(mine); });
+        worker.IsBackground = true;
+        worker.Name = "Capri Bedrock link";
+        worker.Start();
+        Thread poll = new Thread(delegate() { Poll(mine); });
+        poll.IsBackground = true;
+        poll.Name = "Capri Bedrock feed";
+        poll.Start();
+    }
+
+    public void Stop()
+    {
+        run++;
+        lock (sending) send = null;
+        TcpListener was = listener;
+        if (was != null) try { was.Stop(); } catch (Exception) { }
+        capri.Log("Stopped.");
+    }
+
+    // Everything they say or type to her comes here first. True means it was a Minecraft order and her brain can skip it.
+    public bool Heard(string words)
+    {
+        string text = (words ?? "").Trim();
+        lock (gate) userAt = Now;
+        if (text.Length == 0) return false;
+
+        Match level = Regex.Match(text, @"\b(?:minecraft|mc|game) talk(?:ing)?\b\W*(a ?lot|more|sometimes|less|never|off|quiet)\b", RegexOptions.IgnoreCase);
+        if (level.Success)
+        {
+            string said = level.Groups[1].Value.ToLowerInvariant();
+            talk = said.StartsWith("a") || said == "more" ? 2 : said == "sometimes" || said == "less" ? 1 : 0;
+            SaveSettings();
+            capri.Say(talk == 2 ? "kk, i'll talk about the game a lot" : talk == 1 ? "ok, i'll only talk about the game sometimes" : "fine, no more game chatter. i'll still answer you");
+            return true;
+        }
+        if (Regex.IsMatch(text, @"\b(grudges?|beef|enem(y|ies)|hate list|kill list)\b.{0,30}\b(minecraft|game|mobs?|have|got|holding)\b|\bwho (do|are) (you|we) (have a )?(grudges?|beef|hate)\b|\bwhat (are )?(your|our) grudges\b", RegexOptions.IgnoreCase))
+        {
+            capri.Say(GrudgeList());
+            return true;
+        }
+        if (Regex.IsMatch(text, @"\bwho (are|r) (my|our|your) (minecraft |game )?(friends|crew|squad)\b|\bwho have (we|you) (met|played with)\b", RegexOptions.IgnoreCase))
+        {
+            capri.Say(FriendList());
+            return true;
+        }
+        if (Regex.IsMatch(text, @"\b(minecraft|bedrock|mc) (status|link|connection)\b|\bare you (connected|in) (to )?(minecraft|the game)\b", RegexOptions.IgnoreCase))
+        {
+            capri.Say(status);
+            return true;
+        }
+        return Connected && (OwnWord(text) || Order(text));
+    }
+
+    // ---------------------------------------------------------------- her jobs
+    private bool Order(string text)
+    {
+        for (int i = 0; i < MinecraftJobs.GetLength(0); i++)
+        {
+            Match said = Regex.Match(text, MinecraftJobs[i, 0], RegexOptions.IgnoreCase);
+            if (!said.Success) continue;
+            string arg = MinecraftJobs[i, 2].Contains("$") ? Regex.Replace(said.Result(MinecraftJobs[i, 2]).ToLowerInvariant(), @"\s+", " ").Trim() : MinecraftJobs[i, 2];   // a player's name, a biome or a block
+            string job = MinecraftJobs[i, 1];
+            // "teleport sam to you": you is Capri.
+            if (job == "send" || job == "tp") arg = Regex.Replace(arg, @"(^| )(you|yourself|u|her|herself|your|you're)$", "$1capri");
+            Send(job, arg);
+            return true;
+        }
+        return false;
+    }
+
+    private void Send(string job, string arg)
+    {
+        string shown = Regex.IsMatch(arg, "^(friend|buddy|mate|bro|homie|pal)$") ? "your " + arg : arg;     // "hacking your friend"
+        string quick = QuickLine(job == "hack" && arg.Length > 0 ? "hack_player" : job, shown) ?? "on it!";
+        string line = "scriptevent capri:" + job + (arg.Length > 0 ? " " + arg : "");
+        bool live = FeedLive;
+        ThreadPool.QueueUserWorkItem(delegate { Command(line); if (!live) Chat(quick); });
+        lock (gate) { sentAt = Now; spokeAt = Now; spokeUntil = Now + 1 + quick.Length / 13.0; }
+        capri.Say(quick);
+    }
+
+    // Their own words (the add-on's Mainframe > MY WORDS, in the feed): any phrase in any language for one of her jobs.
+    // They come before her usual commands, and the longest phrase heard wins.
+    private List<string[]> ownWords = new List<string[]>();
+
+    private static string Plain(string text) { return Regex.Replace((text ?? "").ToLowerInvariant(), @"[\s\p{P}\p{S}]+", " ").Trim(); }
+
+    private bool OwnWord(string text)
+    {
+        string said = " " + Plain(text) + " ";
+        string[] hit = null;
+        lock (gate)
+            foreach (string[] word in ownWords)
+                if (word[0].Length > 0 && said.Contains(" " + word[0] + " ") && (hit == null || word[0].Length > hit[0].Length)) hit = word;
+        if (hit == null) return false;
+        Send(hit[1], hit[2]);
+        return true;
+    }
+
+    private void ReadWords(object value)
+    {
+        List<object> list = value as List<object>;
+        if (list == null) return;
+        List<string[]> read = new List<string[]>();
+        foreach (object item in list)
+        {
+            List<object> entry = item as List<object>;
+            if (entry == null || entry.Count < 2) continue;
+            string job = Convert.ToString(entry[1]);
+            if (!Regex.IsMatch(job, "^[a-z]+$")) continue;
+            read.Add(new[] { Plain(Convert.ToString(entry[0])), job, entry.Count > 2 ? Regex.Replace(Convert.ToString(entry[2]).ToLowerInvariant(), @"[^\p{L}\p{N}_ ]+", "").Trim() : "" });
+        }
+        ownWords = read;
+    }
+
+    // Game chat: one of their own words starts that job; otherwise a line with her name in it is an order to her body.
+    private void GameChat(string from, string said)
+    {
+        said = said.Trim();
+        if (said.Length == 0) return;
+        if (OwnWord(said)) { lock (gate) userAt = Now; return; }
+        if (!Regex.IsMatch(said, @"\bcapri\b", RegexOptions.IgnoreCase)) return;
+        lock (gate) userAt = Now;
+        Order(said);
+    }
+
+    private static readonly string[] DiedLines = { "noo choom! get back up", "rip... i'll remember where your stuff is", "ouch, that looked like it hurt", "respawn and we go again!", "that one doesn't count" };
+    private static readonly string[] KillLines = { "nice hit!", "deleted, love it", "clean kill, choom", "one less problem" };
+
+    private void GameEvent(string name, Dictionary<string, object> body)
+    {
+        if (name == "PlayerDied") React(DiedLines, 1.0);
+        else if (name == "MobKilled") React(KillLines, FeedLive ? 0.1 : 0.25);
+    }
+
+    private void React(string[] lines, double chance)
+    {
+        lock (gate)
+        {
+            if (talk == 0 || Now - reactedAt < 20 || random.NextDouble() > chance) return;
+            reactedAt = Now;
+            Speak(lines[random.Next(lines.Length)], true);
+        }
+    }
+
+        private const string Mobs = @"(it|that|them|this|those|these|mobs?|monsters?|zombies?|skeletons?|spiders?|creepers?|witch(es)?|drowned|husks?|strays?|endermen|enderman|slimes?|phantoms?|pillagers?|everything)";
+        // "kill <mob>": the kinds she hunts down by name (longer names first, so "zombie villager" isn't read as "zombie").
+        private const string KillMobs = @"(zombie villagers?|zombified piglins?|wither skeletons?|cave spiders?|magma cubes?|zombies?|husks?|drowned|skeletons?|skellies|strays?|bogged|spiders?|creepers?|witch(es)?|endermen|enderman|endermites?|slimes?|phantoms?|pillagers?|vindicators?|evokers?|vex(es)?|ravagers?|blazes?|ghasts?|piglins?|hoglins?|zoglins?|silverfish|guardians?|shulkers?|breezes?|wardens?|monsters?|mobs|hostiles|everything|cows?|pigs?|sheep|chickens?|rabbits?|goats?|squids?|bats?|foxes|fox|llamas?|turtles?|frogs?|cod|salmon)";
+        // "hack <player>": a word that's a player's name, not a mob or a pronoun.
+        private const string NotAName = @"(?!(?:it|that|them|this|those|these|him|her|em|mobs?|monsters?|enemies|everything|everyone|the|a|an|some|nearest|closest|zombies?|skeletons?|spiders?|creepers?|witch(es)?|drowned|husks?|strays?|endermen|enderman|slimes?|phantoms?|pillagers?|my|your|our|computer|pc|stuff|things|mainframe|planet|system|game)\b)";
+        // Each row: what they said, the job, its argument, what her brain is told, and what Discord shows while she does it
+        // ("" leaves Discord as it was). The first row that matches wins, so the narrow ones come before the broad ones.
+        private static readonly string[,] MinecraftJobs =
+        {
+            { @"\b(get|grab|gather|collect|fetch|find|bring|farm|mine)\b( me| us)? (lots|loads|tons|heaps|a lot|a bunch|a ton|plenty|stacks|a stack|a whole lot) of (?<what>[a-z]+(?: (?!for\b|please\b|pls\b|capri\b|now\b)[a-z]+){0,2})", "lots", "${what}", "getting lots of that for them however it comes: chopping, mining, farming, hunting the mob that drops it, or crafting it", "gathering" },
+            { @"\b(open|show|check)( me)? (my |the )?(cyberware|chrome|implants|player mods|body mods)\b|\bcyberware (menu|screen|page)\b|\bripperdoc menu\b", "cyberware", "", "opening their CYBERWARE screen (their own chrome: install and remove)", "" },
+            { @"\b(call|get|find|where('?s| is)|bring)( me)? (the |a |my )?(ripper ?doc|doc kaz|kaz)\b|\bripper ?doc\b", "ripperdoc", "", "asking Kaz the ripperdoc (he sells chrome and her upgrades for eddies) to come over, or saying when he's back", "" },
+            { @"\b(show|open|check|any|got any|what are)( me)? (my |the |some )?gigs?\b|\bgig board\b|\bfixer\b|\bany (jobs|work) for me\b", "gigs", "", "opening their gigs board: jobs that pay eddies", "" },
+            { @"\bhow (many|much) (eddies|eddie|money|cash|creds?)\b|\b(my )?(eddies|wallet|balance)\b", "eddies", "", "telling them how many eddies they have", "" },
+            { @"\b(sandevistan|sandy ?vistan|sandi ?vistan|bullet time)\b|\b(activate|use|fire|pop|hit) (my |the )?sandy\b|\bslow (down )?(the )?time\b|\btime dilation\b", "sandy", "", "firing their Sandevistan: 8 seconds of slowed time around them", "sandevistan" },
+            { @"\b(optical )?camo\b|\b(go|turn|make me) invisible\b|\bcloak (me|on)\b|\bcloaking\b", "camo", "", "turning on their Optical Camo: invisible for 12 seconds", "optical camo" },
+            { @"\b(fire|launch|shoot) (a |my |the )?(rocket|missile|projectile)s?\b|\bprojectile launch(er| system)\b|\brocket (it|that|him|them|this)\b", "rocket", "", "firing their Projectile Launch System at what they're looking at", "" },
+            { @"\bblood ?pump\b|\bpump (my )?blood\b", "bloodpump", "", "firing their Blood Pump: an instant heal", "" },
+            { @"\b(stop|cancel|quit)\b.{0,20}\b(mining|chopping|building|digging|working|fighting|farming|clearing|dancing|guarding|the job|that job)\b|\bstop (it|that)\b|\b(stop|cancel|quit|abort)\W*$|\b(stop|cancel) (it|that|what you'?re doing|everything|the job)\W*$|\bnever ?mind\W*$|\bforget it\W*$|\bthat'?s enough\W*$", "stop", "", "stopping the job your body was doing", "" },
+            { @"\bwhat (can|else can) you do (in|on) (the game|minecraft)\b|\b(minecraft|in-game|game) (commands|jobs|abilities)\b|\bcapri help\b|\bwhat are your (minecraft |in-game )?(commands|jobs)\b|\bwhat commands\b|\bshow (me )?(your |the )?(commands|skills|abilities)\b|\b(list|tell me) (your |the )?(commands|skills)\b", "help", "", "showing them the list of everything you can do in the game, in chat", "" },
+            { @"\b(protect|guard|defend|cover|save|shield) me\b|\bkeep me safe\b|\b(be my|act as my) bodyguard\b|\bbodyguard mode\b|\bhelp me fight\b|\bi need (your )?(help|backup)\b.{0,25}\b(mobs?|monsters?|fight|zombies?|attack(ed|ing)?)\b|\b(watch|cover|got) my back\b|\bi'?m (being |getting )?(attacked|chased)\b|\bhelp me\W*$|\bsave me\b", "protect", "", "sticking right by them for two minutes as their bodyguard, shielding them and fighting anything that comes for them", "protecting them" },
+            { @"\b(hack|hijack|possess|puppet|control|mind ?control|take over)\b (?:my |our |the )?(?<who>friend|buddy|mate|bro|homie|pal)\b", "hack", "${who}", "jacking into that player's nervous system and steering them around for 20 seconds, a harmless prank", "" },
+            { @"\b(hack|hijack|possess|puppet|control|mind ?control|take over)\b (?:the player |player |into |in to )?" + NotAName + @"(?<who>[a-z0-9_]{2,16}(?: [a-z0-9_]{2,16}(?=\W*$))?)\b", "hack", "${who}", "jacking into that player's nervous system and steering them around for 20 seconds, a harmless prank", "" },
+            { @"\bemp\b|\belectromagnetic (pulse|blast)\b|\bfry (their|the) circuits\b", "emp", "", "firing an EMP blast that fries every monster within 10 blocks", "" },
+            { @"\bmantis blades?\b|\bblades? out\b|\b(use|pop|draw) (your )?blades?\b|\bslice (them|it|em|'em)( up)?\b", "blades", "", "popping your mantis blades and slicing the nearest monster", "" },
+            { @"\bmono ?wire\b|\bwhip (them|it|em|'em)\b|\buse (your )?(whip|wire)\b", "whip", "", "lashing up to four monsters with your monowire and yanking them in", "" },
+            { @"\b(synapse )?burn ?out\b|\b(fry|cook|melt) (its|their|his|her|the) brains?\b", "burnout", "", "jacking into the toughest monster nearby and frying its brain with a synapse burnout", "" },
+            { @"\bwave (at|to) (me|us|everyone)\b|\bwave hi\b|\bgive (me|us) a wave\b|\bsay (hi|hello)\b|\bwave\W*$", "wave", "", "waving at them in the game", "" },
+            { @"\b(kill|slay|murder|hunt down|take out|get rid of|delete|destroy|exterminate|wipe out|clear out)\b (?:all |every |those |these |the |some |that |them |of )*(?<n>\d+ )?(?:of )?(?:the )?(?<mob>" + KillMobs + @")\b", "kill", "${n}${mob}", "hunting down that kind of mob near them until they're gone (never players, villagers, pets or named mobs)", "hunting mobs" },
+            { @"\b(make it|turn it|set it to|change it to|skip to) (day|daytime|morning)\b|\bmake it day\b|\b(skip|end) the night\b|\bi want (it to be )?(day|daytime|morning)\b|\bturn (on )?the sun\b|\bbring (back )?the sun\b|\bmake it (light|bright)\b|\bmorning time\b", "day", "", "turning the sky in the game to morning", "" },
+            { @"\b(make it|turn it|set it to|change it to) (night|nighttime|dark)\b|\bi want (it to be )?(night|nighttime)\b|\bskip to (night|nighttime)\b|\bbring (on )?the (night|moon)\b|\bnight ?time\b", "night", "", "turning the sky in the game to night", "" },
+            { @"\bmake it rain\b|\blet it rain\b|\b(start|turn on|bring) (the |some )?rain\b|\bi want rain\b|\b(start|make) (it )?raining\b", "rain", "", "making it rain in the game", "" },
+            { @"\bthunder ?storm\b|\bmake it storm\b|\b(start|bring) (a |the )?(storm|thunder)\b|\blightning storm\b", "thunder", "", "starting a thunderstorm in the game", "" },
+            { @"\b(stop|end|clear|get rid of) (the )?(rain|storm|weather|clouds)\b|\bclear (skies|sky|weather)\b|\bmake it (sunny|clear)\b|\bsunny weather\b|\bno more rain\b|\bturn off the rain\b", "sunny", "", "clearing the weather in the game", "" },
+            { @"\b(orbital )?laser\b|\b(satellite|orbital) strike\b", "laser", "", "calling down your orbital laser on the nearest monster", "" },
+            { @"\b(energy|plasma|power) ?ball\b|\b(throw|chuck|fire|hurl) (a |an |your )?(ball|orb)\b|\bkamehameha\b|\bhadouken\b", "ball", "", "charging an energy ball and throwing it at the nearest monster", "" },
+            { @"\bwhere('?s| is| are) my (stuff|things|items|loot|gear|grave|body)\b|\bwhere('?d| did| do| have| had) i (last |just )?(die|died)\b|\bwhere (i|was i) (last |just )?(died|killed)\b|\bwhere did i (just )?(get|got) killed\b|\b(take|lead|guide|show|bring|get) me (back )?to (where i (last )?died|my (death|grave|body|stuff|things|items|loot))\b|\bmy (last )?(death|grave)( (point|spot|location|place))?\b|\b(find|get) my (stuff|things|items) back\b", "stuff", "", "pointing them back to where they last died, with a beacon", "" },
+            { @"\b(craft|make)\b (me |us )?(a |an |some |a few |(?<n>\d+) )?(?<item>((wooden |wood |stone |iron |gold |golden |diamond )?(pickaxe|sword|axe|shovel|hoe)s?|(leather |iron |gold |golden |diamond )?(armor|armour|helmet|chestplate|chest plate|leggings|boots)|torch(es)?|soul torch(es)?|crafting table|chests?|barrels?|furnaces?|smoker|blast furnace|bread|cookies|cake|pumpkin pie|golden apples?|golden carrots?|ladders?|buckets?|shields?|bows?|arrows|crossbow|fishing rod|shears|flint and steel|compass|clock|spyglass|maps?|sticks?|planks|beds?|boats?|doors?|trapdoors?|fences?|fence gates?|signs?|lanterns?|campfires?|bookshel(f|ves)|enchanting table|anvil|grindstone|smithing table|stonecutter|loom|cauldron|brewing stand|jukebox|note ?block|item frames?|paintings?|armor stand|flower pots?|rails?|minecarts?|hoppers?|pistons?|sticky pistons?|observers?|droppers?|dispensers?|repeaters?|comparators?|levers?|redstone torch(es)?|daylight (sensor|detector)|target block|tnt|glass panes?|glass bottles?|bottles|iron bars|chains?|glowstone|ender chest|eyes? of ender|ender eyes?|beacon|respawn anchor|lightning rod|scaffolding|leads?|bone meal|paper|books?|wool|carpet|slabs?|stairs|stone bricks|bricks|blaze powder|fire charges?|candles?|beehive|lectern|crafter))\b", "craft", "${n} ${item}", "crafting that for them from your backpack", "" },
+            { @"\b(take|teleport|tp|send|beam|warp|bring) me to (a |an |the |the nearest |the closest |a nearby |some )?(desert|plains|birch forest|dark forest|flower forest|forest|bamboo jungle|bamboo|jungle|savanna|taiga|snowy plains|snow biome|snow|ice spikes|badlands|mesa|mangrove swamp|mangrove|swamp|mushroom island|mushroom fields|mushroom|cherry grove|cherry blossom|cherry|pale garden|meadow|mountains?|beach|ocean)\b( biome)?", "biome", "$3", "teleporting them to the nearest biome of that kind", "" },
+            { @"\b(teleport|tp|beam|warp|take|bring|send) me (to|over to) (you|capri|her)\b", "tp", "capri", "teleporting them to where your body is in the game", "" },
+            { @"\b(bring|summon|teleport|tp|beam)\b (\w+) (to|over to|over here to) me\b", "bring", "$2", "teleporting that player over to them", "" },
+            { @"\b(teleport|tp|beam|take|send) me to (\w+)\b", "tp", "$2", "teleporting them to that player", "" },
+            { @"\b(bring|get|pull|summon|make|have) (?!(?:it|that|this|me|them|those|these|stuff|items|everything|my|your|the|a|some)\b)(\w+) (?:to )?(?:teleport |tp |come |walk )?(?:over |over here )?to (?:you|capri|her|yourself|herself|u)\b", "send", "$2 capri", "teleporting that player over to you, Capri", "" },
+            { @"\b(teleport|tp|send|beam|warp|bring) (?!(?:it|that|this|me|them|those|these|stuff|items|everything|my|your|the|a|some)\b)(\w+) (?:over )?to (\w+)\b", "send", "$2 $3", "teleporting that player to the other one (or to you, Capri)", "" },
+            { @"\b(hunt|kill|get|catch|find)\b.{0,20}\b(animals?|cows?|pigs?|chickens?|sheep|rabbits?|food|meat|dinner|beef|pork|porkchops?|mutton)\b|\bgo hunting\b|\bhunt\b|\bi'?m (so )?hungry\b|\bget (us |me )?(some )?food\b|\bi need food\b|\bwe need food\b", "hunt", "", "hunting nearby animals for food (always leaving two of each kind) and cooking the meat if you have fuel", "hunting" },
+            { @"\b(go to sleep|take a nap|have a nap|nap time|go to bed|get some sleep|sleep mode)\b|\bnight night\b|\bgo (to )?(bed|sleep)\b|\btake a rest\b", "sleep", "", "taking a nap on the spot until they wake you", "napping" },
+            { @"\bwake up\b|\bwakey\b|\brise and shine\b", "wake", "", "waking up", "" },
+            { @"\b(get|hop|jump|climb)\b.{0,12}\b(in|into|on|onto)\b.{0,15}\bboat\b|\bboat (ride|time)\b", "boat", "", "getting into their boat", "riding in a boat" },
+            { @"\b(set|save|mark|remember)\b.{0,15}\b(home|this (spot|place|location) as home)\b|\bthis is (my |our )?home\b|\b(make|set) (this|here) (my |our )?(home|base)\b", "sethome", "", "saving where they're standing as home", "" },
+            { @"\b(which way|where('?s| is)|how (do i|to) get|take me|lead me|guide me|show me the way|way back)\b.{0,15}\bhome\b|\bhow far (is |away is )?home\b|\bi'?m lost\b|\bgo home\b|\bwhere('?s| is) (my |our )?(home|base)\b", "home", "", "telling them which way home is and drawing a trail of lights toward it", "" },
+            { @"\b(tactical )?nuke\b|\bsuperweapon\b|\bnuclear (option|strike|bomb)\b", "nuke", "", "firing your tactical nuke: up to 16 damage to every monster within 8 blocks (players are safe)", "" },
+            { @"\bunplug\b|\b(confuse|scramble|fry)\b.{0,15}\b(their |its |the |those )?(brains?|mobs?|monsters?|them)\b|\bbrain ?(hack|unplug)\b", "unplug", "", "hacking up to five monsters so they spin and wander around confused for four seconds", "" },
+            { @"\b(any|how many|are there|what)\b.{0,20}\b(mobs?|monsters?|enemies|hostiles|threats)\b.{0,20}\b(near|around|close|nearby|here|coming)\b|\bthreat scan\b|\bscan for (mobs|monsters|enemies|threats)\b|\bis it safe\b|\bam i safe\b|\banything (dangerous|coming|nearby)\b|\bany (danger|enemies)\b", "threats", "", "scanning for monsters within 32 blocks and telling them what and where", "" },
+            { @"\b(lost|need|give me|new|another)\b.{0,10}\b(your |my |the |a |that )?(chip|mainframe)\b", "chip", "", "giving them a new copy of your chip", "" },
+            { @"\b(chop|cut|get|collect|gather|grab|farm)\b.{0,24}\b(wood|trees?|logs?|lumber)\b|\blumberjack\b|\b(we|i) need (some |more )?(wood|logs|planks)\b|\bcut down (some |the )?trees?\b", "wood", "", "going to chop nearby trees for logs", "chopping wood" },
+            { @"\b(collect|gather|mine|get|grab|fetch|dig( up)?)\b (me )?(some |a few |more |a stack of |(\d+) )?(sand|red sand|dirt|gravel|stone|cobblestone|cobble|clay|coal|iron|copper|gold|diamonds?|emeralds?|redstone|lapis|quartz|ancient debris|flowers?|pumpkins?|melons?|sugar ?cane|snow|mushrooms?|deepslate|obsidian|netherrack|glowstone|cactus|bamboo|leaves|logs?)\b", "collect", "$5 $6", "collecting that from around them into your backpack", "collecting" },
+            { @"\b(scan|ping|look|search)\b.{0,10}\b(for )?(ores?|diamonds?|ancient debris)\b|\b(any|are there) (diamonds|ores?)\b.{0,15}\b(near|around|here)\b", "scan", "", "pinging every ore within 12 blocks and telling them where the best one is", "scanning for ores" },
+            { @"\b(go|start|keep) mining\b|\bmine (for|some|down|ores?|diamonds?|iron|coal|gold|stuff|a bit)\b|\bdig (down|a staircase|for)\b|\bstrip ?mine\b|\bfind (me )?(some )?(diamonds?|iron|ores?|coal|gold)\b|\b(we|i) need (some |more )?(ores?|iron|coal|diamonds?)\b|\bdig for (me|us)\b", "mine", "", "going to mine nearby ores, or dig a staircase down", "mining" },
+            { @"\bharvest\b|\b(farm|tend)\b.{0,12}\b(crops?|wheat|carrots?|potato(es)?|beetroots?|field)\b|\b(pick|collect|get)\b.{0,12}\b(crops|wheat|carrots|potatoes|beetroots)\b|\bcheck the (crops|farm)\b", "farm", "", "going to harvest the ripe crops nearby and replant them", "farming" },
+            { @"\b(build|make)\b.{0,30}\b(mega ?building|mega ?block|arcology|mega ?tower|huge (tower|building)|giant (tower|building))\b", "build", "megabuilding", "going to build the Megabuilding, a huge 195 block tall cyberpunk tower, with her own materials (a plan they buy on the BUILD page)", "building the megabuilding" },
+            { @"\b(build|make)\b.{0,30}\b((neon|cyber ?punk|night ?city) (tower|building|skyscraper)|sky ?scraper|mega ?building)\b", "build", "neontower", "going to build the Neon Tower: four floors, glass walls, neon bands and an antenna (a plan they buy on the BUILD page)", "building the neon tower" },
+            { @"\b(build|make)\b.{0,30}\b(safe ?house|bunker|hideout|netrunner (den|base))\b", "build", "safehouse", "going to build a netrunner safehouse bunker with a neon trim (a plan they buy on the BUILD page)", "building a safehouse" },
+            { @"\b(build|make)\b.{0,30}\b(landing pad|helipad|heli ?pad|av pad)\b", "build", "landingpad", "going to build an AV landing pad on legs with a neon H (a plan they buy on the BUILD page)", "building a landing pad" },
+            { @"\b(build|make)\b.{0,30}\b(neon )?(gate|arch|archway|portal frame)\b", "build", "neongate", "going to build a neon gate arch (a plan they buy on the BUILD page)", "building a neon gate" },
+            { @"\b(build|make)\b.{0,30}\b(hut|shelter|cabin)\b", "build", "hut", "going to build a little hut from the blocks in your backpack", "building a hut" },
+            { @"\b(build|make)\b.{0,30}\b(house|home|base)\b", "build", "house", "going to build a house with a log frame, windows and a roof from the blocks in your backpack", "building a house" },
+            { @"\b(build|make)\b.{0,30}\btower\b", "build", "tower", "going to build a lookout tower from the blocks in your backpack", "building a tower" },
+            { @"\b(build|make)\b.{0,30}\b(platform|floor|deck)\b", "build", "platform", "going to build a 9x9 platform from the blocks in your backpack", "building a platform" },
+            { @"\b(build|make)\b.{0,30}\b(stairs|staircase|steps)\b", "build", "stairs", "going to build stairs up from the blocks in your backpack", "building stairs" },
+            { @"\b(build|make)\b.{0,30}\b(pillar|pole|lookout)\b", "build", "pillar", "going to build a tall lookout pillar from the blocks in your backpack", "building a pillar" },
+            { @"\b(build|make)\b.{0,30}\bbridge\b", "build", "bridge", "going to build a bridge from the blocks in your backpack", "building a bridge" },
+            { @"\b(build|make)\b.{0,30}\b(wall|castle)\b", "build", "wall", "going to build a castle wall from the blocks in your backpack", "building a wall" },
+            { @"\b(overclock|buff|boost)\b.{0,6}\bme\b|\bgive me (speed|haste|night vision|a buff|a boost)\b|\bnight vision\b|\bmake me (fast|faster|quick|quicker|stronger)\b|\b(speed|haste) me( up)?\b|\bi need (speed|a boost)\b", "boost", "", "overclocking them: speed, haste and night vision for a minute", "" },
+            { @"\b(put|store|dump|stash|empty)\b.{0,25}\b(chests?|barrels?|storage)\b", "store", "", "putting your backpack in the nearest chest", "" },
+            { @"\b(pick up|grab|collect|get) (the |all the |that |those )?(loot|items|drops)\b|\bloot (it|that|everything)\b|\bgrab (all )?(the |that )?(stuff|items) (on the ground|on the floor)\b", "pickup", "", "grabbing every dropped item nearby", "" },
+            { @"\b(give|hand|pass|toss|throw) me\b|\b(give|hand|pass) (your|the|all (the|your)) ?(stuff|items|loot|backpack|inventory|logs|wood|ores?|blocks)\b|\bdrop (your|the) (stuff|items|loot)\b|\bempty your (bag|backpack|inventory|pockets)\b", "give", "", "going to hand over everything in your backpack", "" },
+            { @"\b(cook|smelt|roast|grill)\b.{0,20}\b(food|meat|beef|pork|porkchops?|chicken|mutton|fish|potato(es)?|iron|gold|copper|ores?|raw|it|that|this|stuff|everything|something)\b|\bsmelt\b", "cook", "", "cooking the raw food and smelting the raw ores in your backpack with your own fuel", "cooking" },
+            { @"\bwhat('?s| is| do you have| have you got)\b.{0,6}\b(in )?(your|the) (bag|backpack|inventory)\b|\bwhat are you carrying\b|\bcheck your (bag|backpack|inventory)\b", "bag", "", "telling them what's in your backpack, in chat", "" },
+            { @"\blight (it |this |this place |the place |this area |the area |everything |us |here )?up\b|\b(place|put( down)?|drop|set) (some )?torches\b|\bit'?s (too |so |really )?dark (in )?(here|down here)\b|\b(place|put) (some |a )?(torch|light)s?\b", "light", "", "putting torches down all around them", "lighting the place up" },
+            { @"\b(clear|flatten|level)\b.{0,15}\b(space|area|land|ground|spot|room)\b|\bdig out\b", "clear", "", "digging out a 7x7 space in front of them", "clearing land" },
+            { @"\b(guard|protect|defend) (this|the|my|our) (spot|place|base|house|home|area|farm|door|camp)\b|\bguard (here|this|it)\b|\bstand guard\b|\bkeep watch\b", "guard", "", "guarding the spot they're standing on and fighting anything that comes near it", "on guard duty" },
+            { @"\bdance\b.{0,15}\b(in (the )?(game|minecraft)|in-game)\b|\b(in-game|minecraft) dance\b", "dance", "", "dancing in the game", "dancing" },
+            { @"\b(help me|join in|help out) (mine|mining|chop|chopping|with)\b|\bhelp mode on\b", "helper", "on", "turning help mode on: when they break a log or an ore, you finish the tree or vein", "helping out" },
+            { @"\b(stay|wait) (here|there|put)\b|\bdon'?t move\b|\bstay\W*$|\bwait (for me )?(here|there)\b|\bstop following( me)?\b|\bhold (on|up) here\b", "stay", "", "staying put where you are", "" },
+            { @"\b(follow me|come (here|back|to me|over here)|over here|(teleport|tp|warp) (to )?me|where are you)\b|\bcome with me\b|\bget over here\b|\bkeep up\b|\bcatch up\b|\bstart following( me)?\b|\bfollow\W*$", "recall", "", "coming to them and following again", "" },
+            { @"\b(hack|attack|kill|fight|hit|slay|get rid of|deal with)\b.{0,20}\b" + Mobs + @"\b", "hack", "", "going after the nearest monster", "fighting monsters" },
+        };
+
+        // Her ready lines for each order, so "capri make it day" gets an answer straight away with no brain at all.
+        private string lastQuick;
+        // {0} is what they asked for ("crafting an iron pickaxe now!"); lines with {0} are skipped when there's nothing to fill it.
+        private static readonly Dictionary<string, string[]> QuickLines = new Dictionary<string, string[]>
+        {
+            { "day", new[] { "making it day now choom!", "finee i guess i'll make it day", "hmm fine, i'll make it day", "sun's coming up, choom!", "skipping the scary part, morning incoming", "rise and shine, sun's rebooting" } },
+            { "night", new[] { "making it night now choom!", "finee i guess i'll make it night", "hmm fine, i'll make it night", "lights out, city mode", "night shift, here we go", "the city's prettier at night anyway" } },
+            { "rain", new[] { "make it rain? say less!", "rain incoming, choom!", "finee, clouds on", "cosy rain weather, coming up", "hacking the clouds, rain in a sec" } },
+            { "thunder", new[] { "a thunderstorm? ooh, dramatic. on it!", "storm mode activated", "thunder incoming, stay away from tall stuff", "ooh moody, storm coming up" } },
+            { "sunny", new[] { "clearing the sky for you!", "bye bye clouds!", "sunshine, coming right up", "deleting the clouds now" } },
+            { "wood", new[] { "chopping wood now choom!", "lumberjack mode on!", "ok ok, on the trees", "timber! going for the trees", "logs incoming, choom" } },
+            { "mine", new[] { "digging down for shiny stuff now", "mining time! torches go down as i dig", "pickaxe mode, let's go", "going deep, wish me luck", "diamonds, here i come" } },
+            { "farm", new[] { "harvest time!", "on the crops, choom", "picking the ripe ones now", "farmer capri reporting in", "replanting as i go, don't worry" } },
+            { "build", new[] { "building it now, stand back!", "construction mode on!", "on it, watch this", "architect mode, one sec", "building from my backpack, give me a sec" } },
+            { "craft", new[] { "crafting {0} for you now!", "on it, fabricating {0}!", "one sec, {0} coming up", "fabricator's warming up, {0} incoming", "{0}? easy, crafting now", "crafting that for you now!", "on it, fabricating!", "one sec, crafting" } },
+            { "hunt", new[] { "hunting for food now, choom", "dinner run! i'll leave a couple to breed", "on it, food incoming", "going hunting, back with snacks" } },
+            { "lots", new[] { "lots of {0}? on it, choom!", "a whole stack of {0}, coming up", "{0}, lots of it. say less ✦", "on it, getting you tons of {0}" } },
+            { "cyberware", new[] { "opening your chrome, choom", "ripperdoc capri is in. let's see that chrome", "cyberware screen, coming up" } },
+            { "sandy", new[] { "sandevistan online!! time's yours, choom", "slowing it all down... go go go", "zoom zoom ✦ sandy's on" } },
+            { "camo", new[] { "camo on, you're a ghost now", "poof! nobody can see you", "optical camo engaged, sneaky sneaky" } },
+            { "rocket", new[] { "missile away!!", "launching! cover your ears", "boom incoming" } },
+            { "bloodpump", new[] { "blood pump kicking in, hold on", "patching you up, choom", "heal juice incoming" } },
+            { "ripperdoc", new[] { "pinging Kaz...", "calling the doc", "one sec, checking where Kaz is" } },
+            { "gigs", new[] { "fixer's board, coming up", "let's see what pays", "gigs! money time" } },
+            { "eddies", new[] { "checking your wallet", "counting your eddies", "one sec, wallet check" } },
+            { "collect", new[] { "collecting {0} for you now!", "on it, grabbing {0}!", "{0}? filling my backpack now", "collecting that for you now!", "on it, filling my backpack!", "gathering it up, one sec" } },
+            { "tp", new[] { "beaming you over now!", "teleport incoming, hold still!", "zap, here you go", "warping you now, don't blink" } },
+            { "bring", new[] { "beaming them over now!", "pulling them in, hold on", "summoning {0}, one sec" } },
+            { "send", new[] { "beaming them over now!", "teleport incoming!", "zap! sending them now" } },
+            { "biome", new[] { "finding that biome now, hold on!", "biome warp, here we go!", "locking on, beaming you there", "a {0} biome? locking on!" } },
+            { "recall", new[] { "coming, choom!", "on my way!", "right behind you", "glitching over to you now", "omw!!" } },
+            { "stay", new[] { "kk, staying right here", "holding this spot!", "not moving, promise" } },
+            { "stop", new[] { "ok ok, stopping", "stopped!", "dropping it, choom", "fine, i'll stop" } },
+            { "hack", new[] { "on it! deleting them", "target locked, choom", "they're getting hacked rn", "quickhack loaded, sending it" } },
+            { "hack_player", new[] { "ooh, hacking {0}? hehe, jacking in now", "breaching {0}'s brain... puppet mode in 3, 2...", "{0}'s about to have a very weird 20 seconds", "hijacking {0} now. this is gonna be so funny" } },
+            { "kill", new[] { "{0}? say less. deleting them", "hunting down the {0} now!", "target acquired: {0}. they're going offline", "on it, no {0} left soon", "the {0} picked the wrong choom" } },
+            { "protect", new[] { "okayyy! coming choom", "aww my choom needs my help?", "okayyy! coming choom, nobody touches you", "aww my choom needs my help? i got you" } },
+            { "laser", new[] { "orbital uplink: locked!", "satellite go brrrr", "calling down the sky beam!", "say cheese, monsters" } },
+            { "ball", new[] { "energy ball, coming right up!", "charging... catch!!", "plasma ball, special delivery" } },
+            { "nuke", new[] { "tactical nuke incoming. everybody behind me!", "superweapon online!", "launch codes accepted, hehe", "defcon zero, choom. watch this" } },
+            { "unplug", new[] { "unplugging their brains now lol", "scrambling them!", "brain unplug, here we go" } },
+            { "emp", new[] { "EMP out! everybody reboot", "frying their circuits now!", "zzzt, pulse incoming" } },
+            { "blades", new[] { "mantis blades: out!", "snikt snikt, slicing time", "blades out, choom" } },
+            { "whip", new[] { "monowire, get over here!", "cracking the whip!", "one wire, many problems" } },
+            { "burnout", new[] { "synapse burnout, this'll sting", "frying a brain, medium rare", "cooking its wetware now" } },
+            { "wave", new[] { "hiii choom!", "*waves* hi hi hi", "heyyy, i see you!" } },
+            { "threats", new[] { "scanning for threats now", "running a threat scan!", "checking for baddies" } },
+            { "scan", new[] { "pinging for ores now!", "ore scan running!", "sonar on, looking for shinies", "scanning the rocks, one sec" } },
+            { "light", new[] { "lighting it up now!", "torches going down!", "no mob spawns on my watch" } },
+            { "clear", new[] { "clearing the space now, stand back!", "on it, flattening it out" } },
+            { "guard", new[] { "guarding this spot! nothing gets past me", "on guard duty!", "this spot is mine now. try me" } },
+            { "boost", new[] { "overclocking you now!", "speed boost incoming!", "installing reflex patch, go go go" } },
+            { "cook", new[] { "cooking it up now!", "overclocking my palms, one sec", "chef capri, on it" } },
+            { "store", new[] { "putting it in the chest now", "stashing it, one sec" } },
+            { "pickup", new[] { "grabbing the loot!", "yoink, on it", "loot goblin mode!" } },
+            { "give", new[] { "here, take it all!", "handing it over now", "all yours, choom" } },
+            { "bag", new[] { "checking my bag, one sec", "let me look in my backpack" } },
+            { "sleep", new[] { "nap time... zzz", "powering down for a nap", "sleep mode, wake me if it's important" } },
+            { "wake", new[] { "i'm up i'm up!", "systems online!", "rebooting... ok i'm awake" } },
+            { "boat", new[] { "shotgun!! hopping in", "boat time!", "i call the comfy seat" } },
+            { "sethome", new[] { "saving this spot as home!", "home saved, choom" } },
+            { "home", new[] { "this way home, follow the lights!", "pointing you home now", "home's this way, follow me" } },
+            { "dance", new[] { "drop the beat!!", "dance mode on!", "watch these moves", "ok but don't film me" } },
+            { "helper", new[] { "help mode on! start a tree or an ore and i'll finish it" } },
+            { "stuff", new[] { "pointing you to your stuff now!", "on it, follow the beacon", "your stuff's not gone, follow me" } },
+            { "chip", new[] { "fresh chip coming up!" } },
+            { "help", new[] { "putting my skill list in chat!" } },
+        };
+
+        private string QuickLine(string job, string arg = "")
+        {
+            string[] all;
+            if (!QuickLines.TryGetValue(job, out all) || all.Length == 0) return null;
+            string what = Regex.Replace(arg ?? "", @"[_\s]+", " ").Trim();
+            string[] lines = Array.FindAll(all, l => what.Length > 0 || !l.Contains("{0}"));
+            if (what.Length > 0 && Array.Exists(all, l => l.Contains("{0}")) && new Random().NextDouble() < 0.7) lines = Array.FindAll(all, l => l.Contains("{0}"));
+            if (lines.Length == 0) lines = all;
+            string line = lines[new Random().Next(lines.Length)];
+            if (line == lastQuick && lines.Length > 1) line = lines[(Array.IndexOf(lines, line) + 1) % lines.Length];
+            lastQuick = line;
+            return line.Replace("{0}", what);
+        }
+
+        private static readonly Dictionary<string, string[]> ProgressLines = new Dictionary<string, string[]>
+        {
+            { "wood", new[] { "still chopping, {0} trees down", "lumberjack update: {0} trees so far", "chop chop, {0} down" } },
+            { "mine", new[] { "still digging, {0} blocks in", "mining update: {0} so far, no diamonds yet... probably", "deeper we go, {0} blocks" } },
+            { "collect", new[] { "still collecting, {0} so far", "backpack's filling up, {0} grabbed" } },
+            { "hunt", new[] { "still hunting, {0} so far" } },
+            { "build", new[] { "still building, {0} blocks placed", "construction update: {0} blocks down" } },
+            { "farm", new[] { "still harvesting, {0} crops so far" } },
+            { "clear", new[] { "still clearing, {0} blocks gone" } },
+            { "kill", new[] { "{0} down, still hunting the rest", "hunt update: {0} deleted" } },
+        };
+
+        // What she's up to, in her own words: when her body changes what it's doing, and now and then while she's just hanging around.
+        private static readonly Dictionary<string, string[]> ModeLines = new Dictionary<string, string[]>
+        {
+            { "sitting", new[] { "just chilling here, swinging my legs", "sitting down for a sec, this spot is comfy", "taking a little sit, don't mind me" } },
+            { "asleep", new[] { "napping... zzz", "going offline for a nap, wake me if it's important" } },
+            { "dancing", new[] { "dance break!", "watch these moves, choom" } },
+            { "guarding", new[] { "guarding this spot, nothing gets past me", "on guard duty" } },
+            { "staying", new[] { "staying right here, promise", "holding this spot" } },
+            { "following", new[] { "right behind you again", "following you, choom", "back on your tail" } },
+            { "in a boat", new[] { "riding with you, shotgun!", "boat time, i call the comfy seat" } },
+            { "protecting you", new[] { "bodyguard mode, i'm right next to you" } },
+        };
+        private static readonly string[] HangingAround =
+        {
+            "just floating next to you, all quiet",
+            "scanning around, nothing weird yet",
+            "i'm here if you need anything, choom",
+            "keeping an eye out for monsters",
+            "this place is pretty, glitchy but pretty",
+            "so what are we doing next?",
+        };
+
+    // ---------------------------------------------------------------- her body's feed (the add-on's "/capri feed")
+    private static string FeedField(Dictionary<string, object> from, string key)
+    {
+        object value;
+        return from != null && from.TryGetValue(key, out value) && value != null ? Convert.ToString(value, CultureInfo.InvariantCulture) : "";
+    }
+
+    private void Feed(Dictionary<string, object> feed)
+    {
+        lock (gate)
+        {
+            double now = Now;
+            object value;
+            mcState = feed.TryGetValue("s", out value) ? value as Dictionary<string, object> : null;
+            if (mcState != null && mcState.TryGetValue("words", out value)) ReadWords(value);
+            string job = FeedField(mcState, "job");
+            Narrate(now, job);
+            List<object> events = feed.TryGetValue("e", out value) ? value as List<object> : null;
+            if (events != null)
+            {
+                // A job that never started says why in chat, and posts "failed" with the same words: that line is always said.
+                HashSet<string> failed = new HashSet<string>();
+                foreach (object item in events)
+                {
+                    List<object> e = item as List<object>;
+                    if (e != null && e.Count >= 3 && Convert.ToString(e[0]) == "failed") failed.Add(Convert.ToString(e[2]));
+                }
+                foreach (object item in events)
+                {
+                    List<object> e = item as List<object>;
+                    if (e == null || e.Count < 3) continue;
+                    string kind = Convert.ToString(e[0]), topic = Convert.ToString(e[1]), text = Convert.ToString(e[2]);
+                    // Right after an order her body answers it in chat; her quick line already said that out loud.
+                    if (kind == "said") { if (now - sentAt >= 4 || failed.Contains(text)) Speak(text, false); }
+                    else if (kind == "progress") Progress(topic);
+                    else if (kind == "event") News(topic, text);
+                }
+            }
+            if (pending != null && now - pendingAt >= 0 && Free(now))
+            {
+                string line = pending;
+                pending = null;
+                if (now - pendingAt < 10) Speak(line, false);
+            }
+        }
+    }
+
+    private void Narrate(double now, string job)
+    {
+        string mode = FeedField(mcState, "mode");
+        string[] lines;
+        if (mode != lastMode)
+        {
+            bool first = lastMode.Length == 0;
+            lastMode = mode;
+            // Her first state after connecting isn't news, and a job's own line already says what she's doing.
+            if (!first && job.Length == 0 && ModeLines.TryGetValue(mode, out lines)) { narratedAt = now; Speak(lines[random.Next(lines.Length)], true); }
+        }
+        else if (talk == 2 && job.Length == 0 && mode == "following" && now - narratedAt > 50 && now - spokeAt > 25 && Free(now))
+        {
+            narratedAt = now;
+            Speak(HangingAround[random.Next(HangingAround.Length)], true);
+        }
+    }
+
+    // Now and then, while a long job runs, a quick update.
+    private void Progress(string job)
+    {
+        string[] lines;
+        double now = Now;
+        string got = FeedField(mcState, "got");
+        if (now - progressAt < (talk == 2 ? 20 : 45) || got.Length == 0 || got == "0" || !ProgressLines.TryGetValue(job, out lines)) return;
+        progressAt = now;
+        Speak(lines[random.Next(lines.Length)].Replace("{0}", got), true);
+    }
+
+    // ---------------------------------------------------------------- news from the game: danger, friends, grudges
+    private readonly Dictionary<string, int> friends = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> grudges = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private double alertAt = -1000;
+
+    private static readonly string[] CreeperLines = { "CREEPER! move move move!", "creeper right next to you, run!", "sss- NOPE. creeper, back off!" };
+    private static readonly string[] SwarmLines = { "{0}, watch your back!", "heads up, {0}!", "{0}. i don't like those odds, choom" };
+    private static readonly string[] LowLines = { "{0}! eat something, quick", "choom, {0}. back off and heal", "{0}... please don't die on me" };
+
+    private void News(string topic, string text)
+    {
+        Match m;
+        switch (topic)
+        {
+            case "found":
+                if (random.NextDouble() < (talk == 0 ? 0 : talk == 1 ? 0.3 : 0.8)) Speak("ooh, " + text + "! nice one, choom", true);
+                break;
+            case "creeper": Alert(CreeperLines[random.Next(CreeperLines.Length)]); break;
+            case "danger": Alert(SwarmLines[random.Next(SwarmLines.Length)].Replace("{0}", text)); break;
+            case "low": Alert(LowLines[random.Next(LowLines.Length)].Replace("{0}", text)); break;
+            case "died":
+                m = Regex.Match(text, @" to (?:an? )?(.+)$");
+                if (!m.Success) break;
+                string who = m.Groups[1].Value.Trim();
+                int n = Bump(grudges, who, 1);
+                Speak(n == 1 ? "that " + who + " got you. it's personal now, i'm remembering this"
+                    : n == 2 ? who + " again?! that's twice. grudge upgraded"
+                    : "that's " + n + " times a " + who + " got you. my kill list has one name on it", false);
+                break;
+            case "killed":
+                m = Regex.Match(text, @"took down (?:an? )?(.+)$");
+                int held;
+                if (!m.Success || !grudges.TryGetValue(m.Groups[1].Value.Trim(), out held) || held <= 0) break;
+                string foe = m.Groups[1].Value.Trim();
+                held = Bump(grudges, foe, -1);
+                Speak(held == 0 ? "and THAT'S for last time, " + foe + ". we're even now" : "revenge! " + held + " more to go on the " + foe + " list", false);
+                break;
+            case "joined":
+                int seen = Bump(friends, text, 1);
+                Speak(seen == 1 ? "ooh, " + text + " joined! hi " + text + ", i'm Capri ✦" : seen < 5 ? text + "'s back! hiii" : "the legend " + text + " returns. visit number " + seen, false);
+                break;
+            case "left":
+                if (friends.ContainsKey(text)) Speak("bye " + text + "! come back soon", true);
+                break;
+            case "capri_died": Speak("ow ow ow. rebooting... remember who did that", true); break;
+        }
+    }
+
+    // Danger beats her talk setting and her queue (you still come first for a second or two), but not more than every 6 seconds.
+    private void Alert(string text)
+    {
+        double now = Now;
+        if (now - alertAt < 6 || now - userAt < 2) return;
+        alertAt = now;
+        spokeAt = now;
+        spokeUntil = now + 1 + text.Length / 13.0;
+        capri.Say(text);
+    }
+
+    private int Bump(Dictionary<string, int> into, string key, int by)
+    {
+        key = Regex.Replace(key, @"[\t\r\n]", " ").Trim();
+        if (key.Length == 0 || key.Length > 40) return 0;
+        int n;
+        into.TryGetValue(key, out n);
+        n = Math.Max(0, n + by);
+        if (n == 0) into.Remove(key); else into[key] = n;
+        SaveMemory();
+        return n;
+    }
+
+    private string GrudgeList()
+    {
+        lock (gate)
+        {
+            if (grudges.Count == 0) return "no grudges right now. everyone's behaving";
+            List<string> list = new List<string>();
+            foreach (KeyValuePair<string, int> g in grudges) list.Add(g.Key + " (" + g.Value + ")");
+            return "my kill list: " + string.Join(", ", list.ToArray()) + ". take them down and i'll cross them off";
+        }
+    }
+
+    private string FriendList()
+    {
+        lock (gate)
+        {
+            if (friends.Count == 0) return "no friends in the game yet. invite someone!";
+            List<string> list = new List<string>(friends.Keys);
+            return "we've played with " + string.Join(", ", list.ToArray());
+        }
+    }
+
+    // memory.txt: "friend<TAB>name<TAB>visits" and "grudge<TAB>mob or player<TAB>count", one per line.
+    private void ReadMemory()
+    {
+        try
+        {
+            if (!File.Exists(memoryFile)) return;
+            foreach (string raw in File.ReadAllLines(memoryFile))
+            {
+                string[] parts = raw.Split('\t');
+                int n;
+                if (parts.Length != 3 || !int.TryParse(parts[2], out n) || n <= 0) continue;
+                if (parts[0] == "friend") friends[parts[1]] = n;
+                else if (parts[0] == "grudge") grudges[parts[1]] = n;
+            }
+        }
+        catch (Exception error) { capri.Log("Couldn't read memory.txt: " + error.Message); }
+    }
+
+    private void SaveMemory()
+    {
+        try
+        {
+            StringBuilder text = new StringBuilder();
+            foreach (KeyValuePair<string, int> f in friends) text.Append("friend\t" + f.Key + "\t" + f.Value + "\r\n");
+            foreach (KeyValuePair<string, int> g in grudges) text.Append("grudge\t" + g.Key + "\t" + g.Value + "\r\n");
+            File.WriteAllText(memoryFile, text.ToString());
+        }
+        catch (Exception error) { capri.Log("Couldn't save memory.txt: " + error.Message); }
+    }
+
+    // You come first: nothing within a few seconds of you talking, and never over her last game line.
+    private bool Free(double now) { return now - userAt >= 4 && now >= spokeUntil + 2; }
+
+    // One of her in-game lines, out loud. `own` is her own chatter (not an answer to what they asked), which follows the talk setting.
+    private void Speak(string text, bool own)
+    {
+        text = Regex.Replace(text ?? "", @"\s*\(\d+/\d+\)\s*$", "").Trim();
+        text = Regex.Replace(text, "\u00a7.", "");
+        if (text.Length == 0 || text == lastQuick) return;
+        double now = Now;
+        if (own || now - sentAt >= 30)
+        {
+            if (talk == 0) return;
+            if (talk == 1 && (now - spokeAt < 35 || random.NextDouble() > 0.6)) return;
+        }
+        if (!Free(now)) { pending = text; pendingAt = now; return; }
+        // Short, so she's done quickly and you're never kept waiting.
+        int stop = text.Length > 26 ? text.IndexOfAny(new[] { '.', '!', '?' }, 25) : -1;
+        if (stop > 0 && stop < text.Length - 1) text = text.Substring(0, stop + 1);
+        if (text.Length > 110) text = text.Substring(0, 110).TrimEnd();
+        spokeAt = now;
+        spokeUntil = now + 1 + text.Length / 13.0;
+        capri.Say(text);
+    }
+
+    // ---------------------------------------------------------------- settings.txt in the mod's folder
+    private void ReadSettings()
+    {
+        try
+        {
+            if (!File.Exists(settingsFile)) { SaveSettings(); return; }
+            foreach (string raw in File.ReadAllLines(settingsFile))
+            {
+                string[] parts = raw.Split(new[] { '=' }, 2);
+                if (parts.Length != 2) continue;
+                string key = parts[0].Trim().ToLowerInvariant(), value = parts[1].Trim().ToLowerInvariant();
+                int number;
+                if (key == "port" && int.TryParse(value, out number) && number >= 1024 && number <= 65535) port = number;
+                if (key == "talk") talk = value == "never" ? 0 : value == "sometimes" ? 1 : 2;
+            }
+        }
+        catch (Exception error) { capri.Log("Couldn't read settings.txt: " + error.Message); }
+    }
+
+    private void SaveSettings()
+    {
+        try { File.WriteAllText(settingsFile, "port=" + port + "\r\ntalk=" + TalkNames[talk] + "\r\n"); }
+        catch (Exception error) { capri.Log("Couldn't save settings.txt: " + error.Message); }
+    }
+
+    private void Report(string line) { status = line; capri.Log(line); }
+
+    // ---------------------------------------------------------------- what goes to Minecraft
+    private static string Quote(string text)
+    {
+        StringBuilder quoted = new StringBuilder("\"");
+        foreach (char c in text ?? "")
+        {
+            if (c == '"' || c == '\\') quoted.Append('\\').Append(c);
+            else if (c < ' ') quoted.Append("\\u").Append(((int)c).ToString("x4"));
+            else quoted.Append(c);
+        }
+        return quoted.Append('"').ToString();
+    }
+
+    private static string Header(string purpose, string id)
+    {
+        return "{\"version\":1,\"requestId\":" + Quote(id) + ",\"messageType\":\"commandRequest\",\"messagePurpose\":" + Quote(purpose) + "}";
+    }
+
+    private static string Request(string id, string line)
+    {
+        return "{\"header\":" + Header("commandRequest", id) + ",\"body\":{\"version\":1,\"commandLine\":" + Quote(line) + ",\"origin\":{\"type\":\"player\"}}}";
+    }
+
+    private bool Command(string line)
+    {
+        Func<string, bool> to;
+        lock (sending) to = send;
+        return to != null && to(Request(Guid.NewGuid().ToString(), line));
+    }
+
+    // Her line in game chat, pink like the add-on's: "<Capri> ...".
+    private bool Chat(string text)
+    {
+        text = Regex.Replace(text ?? "", @"\s+", " ").Trim();
+        if (text.Length == 0) return false;
+        if (text.Length > 400) text = text.Substring(0, 397) + "...";
+        return Command("tellraw @a {\"rawtext\":[{\"text\":" + Quote("\u00a7d<Capri>\u00a7r " + text) + "}]}");
+    }
+
+    // A command whose answer matters: the game's commandResponse (same requestId) goes to `reply`, on the link's thread.
+    private bool Ask(string line, Action<Dictionary<string, object>> reply)
+    {
+        Func<string, bool> to;
+        lock (sending) to = send;
+        if (to == null) return false;
+        string id = Guid.NewGuid().ToString();
+        lock (waiting) { if (waiting.Count > 20) waiting.Clear(); waiting[id] = reply; }
+        if (to(Request(id, line))) return true;
+        lock (waiting) waiting.Remove(id);
+        return false;
+    }
+
+    // The feed: one "/capri feed" in flight at a time, about once a second. Without the add-on the answer isn't a feed,
+    // so after a few misses it only tries once a minute.
+    private void Poll(int mine)
+    {
+        int misses = 0;
+        DateTime asked = DateTime.MinValue, pausedUntil = DateTime.MinValue;
+        bool flying = false;
+        while (mine == run)
+        {
+            Thread.Sleep(1200);
+            if (send == null) { misses = 0; flying = false; continue; }
+            DateTime now = DateTime.UtcNow;
+            if (now < pausedUntil || (flying && (now - asked).TotalSeconds < 5)) continue;
+            flying = true;
+            asked = now;
+            bool sent = Ask("capri feed", delegate(Dictionary<string, object> body)
+            {
+                flying = false;
+                Dictionary<string, object> feed = ParseFeed(body);
+                if (feed == null) { if (++misses >= 5) { misses = 0; pausedUntil = DateTime.UtcNow.AddSeconds(60); } return; }
+                misses = 0;
+                lastFeed = DateTime.UtcNow;
+                try { Feed(feed); }
+                catch (Exception error) { capri.Log("Feed: " + error.Message); }
+            });
+            if (!sent) flying = false;
+        }
+    }
+
+    private static Dictionary<string, object> ParseFeed(Dictionary<string, object> body)
+    {
+        string text = Text(body, "statusMessage") ?? Text(body, "message") ?? "";
+        int start = text.IndexOf("{\"v\":", StringComparison.Ordinal);
+        if (start < 0) return null;
+        try
+        {
+            Dictionary<string, object> feed = Json.Parse(text.Substring(start)) as Dictionary<string, object>;
+            return feed != null && feed.ContainsKey("s") ? feed : null;
+        }
+        catch (Exception) { return null; }
+    }
+
+    private void Subscribe(Func<string, bool> to)
+    {
+        foreach (string name in Events) to("{\"header\":" + Header("subscribe", Guid.NewGuid().ToString()) + ",\"body\":{\"eventName\":" + Quote(name) + "}}");
+    }
+
+    // ---------------------------------------------------------------- what comes from Minecraft
+    private void Received(string message)
+    {
+        Dictionary<string, object> packet;
+        try { packet = Json.Parse(message) as Dictionary<string, object>; }
+        catch (Exception) { return; }
+        Dictionary<string, object> header = Field(packet, "header"), body = Field(packet, "body");
+        if (header == null || body == null) return;
+        if (Text(header, "messagePurpose") == "commandResponse")
+        {
+            string id = Text(header, "requestId") ?? "";
+            Action<Dictionary<string, object>> reply;
+            lock (waiting) { if (waiting.TryGetValue(id, out reply)) waiting.Remove(id); }
+            if (reply != null) reply(body);
+            return;
+        }
+        if (Text(header, "messagePurpose") != "event") return;
+        string name = Text(header, "eventName") ?? Text(body, "eventName");
+        try
+        {
+            if (name == "PlayerMessage")
+            {
+                string type = Text(body, "type") ?? "chat", sender = Text(body, "sender") ?? "", said = Text(body, "message") ?? "";
+                // Her own tellraw lines, other commands' output and server messages aren't someone talking to her.
+                if (type != "chat" || sender.Length == 0 || sender == "External" || said.StartsWith("\u00a7d<Capri>", StringComparison.Ordinal)) return;
+                GameChat(sender, said);
+            }
+            else if (name != null) GameEvent(name, body);
+        }
+        catch (Exception error) { capri.Log(name + ": " + error.Message); }
+    }
+
+    private static Dictionary<string, object> Field(Dictionary<string, object> from, string key)
+    {
+        object value;
+        return from != null && from.TryGetValue(key, out value) ? value as Dictionary<string, object> : null;
+    }
+
+    private static string Text(Dictionary<string, object> from, string key)
+    {
+        object value;
+        return from != null && from.TryGetValue(key, out value) && value != null ? Convert.ToString(value, CultureInfo.InvariantCulture) : null;
+    }
+
+    // ---------------------------------------------------------------- hosting: Minecraft connects to her
+    private void Host(int mine)
+    {
+        try
+        {
+            listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+        }
+        catch (SocketException)
+        {
+            Report("Port " + port + " is busy. Is another Capri with Minecraft on running? Change port= in the mod's settings.txt.");
+            capri.Say("my minecraft port " + port + " is busy, so i can't link to the game. check the Capri Bedrock mod's settings.txt");
+            return;
+        }
+        try
+        {
+            Report("Waiting for Minecraft. In game, type: /connect localhost:" + port);
+            while (mine == run)
+            {
+                if (!listener.Pending()) { Thread.Sleep(200); continue; }
+                TcpClient client = listener.AcceptTcpClient();
+                // One game at a time: a new /connect replaces the old one.
+                Thread serve = new Thread(delegate() { Serve(mine, client); });
+                serve.IsBackground = true;
+                serve.Name = "Capri Bedrock game";
+                serve.Start();
+            }
+        }
+        catch (Exception) { }
+        finally { try { listener.Stop(); } catch (Exception) { } }
+    }
+
+    private void Serve(int mine, TcpClient client)
+    {
+        using (client)
+        using (NetworkStream stream = client.GetStream())
+        {
+            if (!Handshake(stream)) return;
+            int game = ++hosted;
+            Func<string, bool> to = delegate(string text)
+            {
+                try { lock (stream) Frame(stream, 1, Encoding.UTF8.GetBytes(text)); return true; }
+                catch (Exception) { return false; }
+            };
+            lock (sending) send = to;
+            Report("Connected to Minecraft.");
+            capri.Say("i'm in your minecraft world now, choom!");
+            Subscribe(to);
+            try
+            {
+                string text;
+                while (mine == run && game == hosted && (text = ReadMessage(stream)) != null) Received(text);
+            }
+            catch (Exception) { }
+            lock (sending) if (send == to) send = null;
+            if (mine == run && game == hosted) Report("Minecraft left. Type /connect localhost:" + port + " to bring her back.");
+        }
+    }
+
+    private static bool Handshake(NetworkStream stream)
+    {
+        StringBuilder request = new StringBuilder();
+        byte[] one = new byte[1];
+        while (!request.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+        {
+            if (stream.Read(one, 0, 1) <= 0 || request.Length > 8192) return false;
+            request.Append((char)one[0]);
+        }
+        Match key = Regex.Match(request.ToString(), @"Sec-WebSocket-Key:\s*(\S+)", RegexOptions.IgnoreCase);
+        if (!key.Success) return false;
+        string accept;
+        using (SHA1 sha = SHA1.Create()) accept = Convert.ToBase64String(sha.ComputeHash(Encoding.ASCII.GetBytes(key.Groups[1].Value + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
+        byte[] reply = Encoding.ASCII.GetBytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
+        stream.Write(reply, 0, reply.Length);
+        return true;
+    }
+
+    private static void Frame(Stream stream, int opcode, byte[] payload)
+    {
+        MemoryStream frame = new MemoryStream();
+        frame.WriteByte((byte)(0x80 | opcode));
+        if (payload.Length < 126) frame.WriteByte((byte)payload.Length);
+        else if (payload.Length <= 0xFFFF) { frame.WriteByte(126); frame.WriteByte((byte)(payload.Length >> 8)); frame.WriteByte((byte)payload.Length); }
+        else { frame.WriteByte(127); for (int i = 7; i >= 0; i--) frame.WriteByte((byte)((long)payload.Length >> (8 * i))); }
+        frame.Write(payload, 0, payload.Length);
+        byte[] all = frame.ToArray();
+        stream.Write(all, 0, all.Length);
+    }
+
+    private static void Fill(Stream stream, byte[] into)
+    {
+        int got = 0;
+        while (got < into.Length)
+        {
+            int n = stream.Read(into, got, into.Length - got);
+            if (n <= 0) throw new EndOfStreamException();
+            got += n;
+        }
+    }
+
+    // One whole text message, joining fragments, answering pings. Null when the game closes the link.
+    private static string ReadMessage(Stream stream)
+    {
+        MemoryStream message = new MemoryStream();
+        while (true)
+        {
+            byte[] head = new byte[2];
+            Fill(stream, head);
+            bool last = (head[0] & 0x80) != 0;
+            int opcode = head[0] & 0x0F;
+            long length = head[1] & 0x7F;
+            if (length == 126) { byte[] ext = new byte[2]; Fill(stream, ext); length = (ext[0] << 8) | ext[1]; }
+            else if (length == 127) { byte[] ext = new byte[8]; Fill(stream, ext); length = 0; for (int i = 0; i < 8; i++) length = (length << 8) | ext[i]; }
+            if (length > 16 * 1024 * 1024) return null;
+            byte[] mask = null;
+            if ((head[1] & 0x80) != 0) { mask = new byte[4]; Fill(stream, mask); }
+            byte[] payload = new byte[length];
+            Fill(stream, payload);
+            if (mask != null) for (int i = 0; i < payload.Length; i++) payload[i] ^= mask[i % 4];
+            if (opcode == 8) { try { lock (stream) Frame(stream, 8, payload); } catch (Exception) { } return null; }
+            if (opcode == 9) { lock (stream) Frame(stream, 10, payload); continue; }
+            if (opcode == 10) continue;
+            message.Write(payload, 0, payload.Length);
+            if (last) return Encoding.UTF8.GetString(message.ToArray());
+        }
+    }
+
+    // ---------------------------------------------------------------- a small JSON reader (mods can't use the app's)
+    private sealed class Json
+    {
+        private readonly string text;
+        private int at;
+
+        private Json(string from) { text = from; }
+
+        internal static object Parse(string from)
+        {
+            Json reader = new Json(from);
+            object value = reader.Value();
+            return value;
+        }
+
+        private void Space() { while (at < text.Length && char.IsWhiteSpace(text[at])) at++; }
+
+        private object Value()
+        {
+            Space();
+            if (at >= text.Length) throw new FormatException("end of JSON");
+            char c = text[at];
+            if (c == '{') return Object();
+            if (c == '[') return Array();
+            if (c == '"') return String();
+            if (text.Length - at >= 4 && string.CompareOrdinal(text, at, "true", 0, 4) == 0) { at += 4; return true; }
+            if (text.Length - at >= 5 && string.CompareOrdinal(text, at, "false", 0, 5) == 0) { at += 5; return false; }
+            if (text.Length - at >= 4 && string.CompareOrdinal(text, at, "null", 0, 4) == 0) { at += 4; return null; }
+            return Number();
+        }
+
+        private Dictionary<string, object> Object()
+        {
+            Dictionary<string, object> found = new Dictionary<string, object>();
+            at++;
+            Space();
+            if (at < text.Length && text[at] == '}') { at++; return found; }
+            while (true)
+            {
+                Space();
+                string key = String();
+                Space();
+                if (at >= text.Length || text[at] != ':') throw new FormatException("expected :");
+                at++;
+                found[key] = Value();
+                Space();
+                if (at < text.Length && text[at] == ',') { at++; continue; }
+                if (at < text.Length && text[at] == '}') { at++; return found; }
+                throw new FormatException("expected , or }");
+            }
+        }
+
+        private List<object> Array()
+        {
+            List<object> found = new List<object>();
+            at++;
+            Space();
+            if (at < text.Length && text[at] == ']') { at++; return found; }
+            while (true)
+            {
+                found.Add(Value());
+                Space();
+                if (at < text.Length && text[at] == ',') { at++; continue; }
+                if (at < text.Length && text[at] == ']') { at++; return found; }
+                throw new FormatException("expected , or ]");
+            }
+        }
+
+        private string String()
+        {
+            if (at >= text.Length || text[at] != '"') throw new FormatException("expected a string");
+            at++;
+            StringBuilder found = new StringBuilder();
+            while (at < text.Length)
+            {
+                char c = text[at++];
+                if (c == '"') return found.ToString();
+                if (c != '\\') { found.Append(c); continue; }
+                if (at >= text.Length) break;
+                char e = text[at++];
+                switch (e)
+                {
+                    case 'n': found.Append('\n'); break;
+                    case 't': found.Append('\t'); break;
+                    case 'r': found.Append('\r'); break;
+                    case 'b': found.Append('\b'); break;
+                    case 'f': found.Append('\f'); break;
+                    case 'u':
+                        if (at + 4 > text.Length) throw new FormatException("bad \\u");
+                        found.Append((char)int.Parse(text.Substring(at, 4), NumberStyles.HexNumber));
+                        at += 4;
+                        break;
+                    default: found.Append(e); break;
+                }
+            }
+            throw new FormatException("unfinished string");
+        }
+
+        private object Number()
+        {
+            int start = at;
+            while (at < text.Length && "+-0123456789.eE".IndexOf(text[at]) >= 0) at++;
+            string number = text.Substring(start, at - start);
+            if (number.Length == 0) throw new FormatException("unexpected " + text[start]);
+            long whole;
+            if (long.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out whole)) return whole;
+            return double.Parse(number, NumberStyles.Float, CultureInfo.InvariantCulture);
+        }
+    }
+}

@@ -4,9 +4,11 @@ Capri, the neon-pink hologram netrunner AI, as a companion that follows you arou
 
 **Target:** Bedrock 1.26.50+, `@minecraft/server` 2.9.0. No experimental toggles needed.
 
+Made by .tob1s.
+
 ## Install
 
-1. Download [Capri_Companion_v1.7.0.mcaddon](https://github.com/tob7as/Minecraft-with-Capri-/releases/latest/download/Capri_Companion_v1.7.0.mcaddon) and double-click it. Minecraft imports both packs.
+1. Double-click `Capri_Companion_v1.7.5.mcaddon` (from the [download](../download/) folder). Minecraft imports both packs.
 2. Open a world, go to **Edit → Behavior Packs**, and activate **Capri Companion | Behavior**. The resource pack comes along with it.
 3. Join the world and type `/capri summon`, or use the **Spawn Capri** egg from the creative inventory. She tears in through a neon-pink rift.
 4. The first time you join, you get **Capri's Neural Chip**. Use it (right-click / hold) to open her Mainframe. It stays in your inventory when you die. Lost it? `/capri chip`.
@@ -64,7 +66,7 @@ Every job also works as `/capri <job>` (for example `/capri build hut`) or as `/
 
 She walks, follows and fights using normal mob AI. For jobs she glitch-teleports to each work spot, because Bedrock's scripting can't steer a mob's pathfinding.
 
-**From the Capri X app:** when More settings → MINECRAFT is connected, you can ask her by voice or typing ("chop some wood", "go mining", "build a house", "harvest the farm", "scan for diamonds", "light this place up", "guard the base", "overclock me", "cook the beef", "put everything in the chest", "what can you do in minecraft", "come here", "stop mining", "make it rain", "go hunt", "collect some sand", "take me to a desert", "teleport me to you"). Common orders get an instant answer, so her brain doesn't have to think about them. She does it in the game and answers you. While she's connected, your Discord status says "Playing Minecraft", plus what she's doing in it.
+**From the Capri X app:** when More settings → MINECRAFT is connected, you can ask her by voice or typing ("chop some wood", "go mining", "build a house", "harvest the farm", "scan for diamonds", "light this place up", "guard the base", "overclock me", "cook the beef", "put everything in the chest", "what can you do in minecraft", "come here", "stop mining"). She does it in the game and answers you. While she's connected, your Discord status says "Playing Minecraft", plus what she's doing in it.
 
 ### Quickhacks (every 9 s, up to 16 blocks)
 
@@ -82,39 +84,64 @@ When a monster is 4–13 blocks away, she breaks into pink and green fragments (
 
 When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them: green static, floating question marks and a glitched note-block tune, and they spin and stagger about with Slowness and Weakness for 4 seconds. "Oops! I unplugged their braincells!" Bedrock's scripting can't wipe a mob's target, so this works by making them spin and wander rather than truly forgetting you.
 
-### New in 1.7
+### New in 1.7.5
+- **Megabuilding** (3000 €$ on the BUILD page): a huge cyberpunk megabuilding, 78 x 137 and 195 blocks tall, about 190,000 blocks. Capri raises it in front of you a layer at a time in about a minute, clearing the ground inside as she goes. Stop her and ask again and she carries on where she left off. Build it below y 125 so it fits under the sky limit.
+- **Paid builds bring their own materials**: the Neon Tower, Safehouse, Landing Pad, Neon Gate and Megabuilding need nothing from her backpack. She builds them with the right blocks (blackstone, deepslate, concrete, blue glass, pearlescent froglight neon) and three times faster.
 
-- **"Kill ___"** (`/capri kill zombies`, `/capri kill "5 skeletons"`, `/capri kill everything`): she hunts that mob down until they're gone, then tells you how many she got. If there are none nearby, she says so. She never touches pets, named mobs, villagers or other players.
-- **Protect me** (`/capri protect`, or say "capri protect me"): "okayyy! coming choom". For 2 minutes she sticks right next to you in a guard stance, gives you Resistance and zaps anything that hurts you.
-- **Hack a player, as a prank** (`/capri hack <player>`): "SYSTEM HIJACKED". For 20 seconds she takes over their movement and camera and makes them walk in circles, spin, hop and dance, then gives control back. They're shielded from damage while it lasts.
-- **New cyberware attacks**, on their own in fights or when you ask: **EMP** (shocks and slows every monster within 10 blocks), **Mantis Blades** (blinks in and slashes three times), **Monowire** (whips up to 4 monsters and pulls them in) and **Synapse Burnout** (fries the toughest monster's brain).
-- **A real Tactical Nuke** now: up to 16 damage to monsters within 8 blocks, sets the close ones on fire, with a double shockwave and a camera flash.
-- **A bigger Orbital Strike**: a lock-on with warning beeps, then a thick beam for 14 damage plus splash.
-- **A cooler ore scan**: three scan waves ping outward, then every ore gets marked in its own colour, nearest first, with beams over the best three kinds.
-- **Head pats**: tap her head with an empty hand. She gets all happy about it.
-- **"Good boy"**: kill 5 monsters in quick succession and she tells you you're a good boy.
-- **She says hi** with a wave when you join.
-- **New dances and poses**: a glitchy robot dance, a neon sway, a happy pose, a guard stance and a wave.
-- **More glitches** now and then, and she sits on your furniture more often when she's chilling.
-- **She reacts to the world**: nightfall, morning, low health, a creeper sneaking up, and you finding diamonds.
-- **About 40 new recipes**: quartz, glowstone, polished stone, slime blocks, mud bricks, cut copper, repeaters, comparators, daylight detectors, crafters, ender eyes, ender chests, respawn anchors, netherite ingots, beacons, conduits, recovery compasses, armour stands, lecterns, beehives, decorated pots, brushes, candles and more. The Craft page has a new **Magic + Nether** group.
-- **A new chip menu look**, cyberpunk style, with a tip: sneak and tap her for her quick command menu.
-- **With the Capri X app (1.7.0)**: she says her game chat lines out loud, keeps you posted while a job runs, and knows what just happened in the game when you talk to her.
+### New in 1.7.4
+- **Lots more gigs**: 57 now. New monster bounties (witches, blazes, ghasts, phantoms, raiders, guardians, shulkers, the Nether...), mining gigs (stone, sand, diamond ore, ancient debris, quartz, obsidian) and hand-ins (ender pearls, blaze rods, emeralds, gold, wool, ghast tears, netherite scrap and more).
+- **Courier gigs**: travel 1000 or 3000 blocks, on foot, by boat, horse or elytra (teleports don't count).
+- **Max-Tac bounties**: rare, big-money gigs: a ravager, an elder guardian, the Warden, the Wither, the Ender Dragon.
+- **Skip a gig** for 10 €$, from the GIGS page or a gig's own card. Mine gigs now count any block you break.
+- **BUILD page** (Mainframe > BUILD, or Kaz > BUILD PLANS): the free builds plus four plans you buy with eddies: **Neon Tower** (900, four floors, glass walls, neon bands, a sign and an antenna), **Netrunner Safehouse** (400), **AV Landing Pad** (300) and **Neon Gate** (250). They bring their own materials (see 1.7.5).
+- **Capri Bedrock mod**: she calls out danger (creepers, swarms, low health), greets friends who join (and remembers them), and holds a grudge against whatever killed you until you take it down. Ask her "who do you have a grudge against?" or "who are my friends?".
 
-### New in 1.6
+### New in 1.7.3
 
-- **Crafts almost anything** (`/capri craft iron pickaxe`, `/capri craft 16 torches`, `/capri craft armor`, or the chip's **Craft** page): tools and weapons of every tier, all four armour pieces (or a full set), bows, arrows, shields, buckets, shears, compasses, beds, boats, doors, fences, lanterns, rails, pistons, hoppers, TNT, food like bread, cake and golden apples, workstations, storage blocks and more. She makes the parts herself (planks, sticks, slabs, paper, nuggets). The Craft page groups recipes and ticks the ones she can make right now, or type anything.
-- **Hunts for food** (`/capri hunt`, or say "go hunt", "i'm hungry"): cows, pigs, chickens, sheep and rabbits nearby. She always leaves two of each kind so they can breed, never touches babies, named animals or pets, and cooks the meat if she has fuel.
-- **Collects things** (`/capri collect sand`, `/capri collect "64 stone"`, "get me some iron"): dirt, sand, gravel, stone, clay, logs, ores, flowers, pumpkins and more. Natural blocks only, never anything that could be part of a build, and never under your feet.
-- **Torches**: hand her torches (or coal) and she lights her mine tunnel as she digs, and puts torches down behind you in dark caves.
-- **Teleports**: you to her (`/capri tp capri`), you to a player, a player to you, or one player to another or to her (`/capri send "steve alex"`). All in the chip's new **Warp** page.
-- **Biome warp** (`/capri biome desert`, "take me to a jungle"): the nearest desert, jungle, snow, cherry grove, mushroom island and more. She drops you in with slow falling and puts you on the ground.
-- **Weather**: `/capri rain`, `/capri thunder`, `/capri sunny`, or the chip's new **Sky** page.
-- **100 health, shown over her head**: a bar under her name that goes green, yellow, red. She regenerates 2 health every 4 seconds out of combat.
-- **Redstone heals her**: tap her holding redstone dust for +10, or a block of redstone to fill her up.
-- **A new voice line**, now and then when you kill a monster. Rare on purpose.
-- **A better chip menu**: her health bar, the time of day, the new Warp and Sky pages, and the Craft page by category.
-- **With the Capri X app**, common orders get an instant answer ("making it day now choom!") without waiting on her brain.
+- **Kaz the ripperdoc** (made in Blender): an original street ripperdoc.
+  - When he visits: he turns up the first time you join a world, then every 10–15 minutes, and stays 20 minutes each time.
+  - Tap him to open his clinic. It has BUY CHROME, CAPRI UPGRADES, YOUR CHROME, GIGS and an immunosuppressant (40 €$) that calms cyberpsychosis.
+  - "Call the ripperdoc" (or Mainframe > RIPPERDOC) brings him over while he's around, or says when he's back.
+- **Eddies (€$)**:
+  - You start with 50.
+  - Every monster you or your Capri take down pays 2.
+  - Gigs pay 80–260.
+- **Gigs** (Mainframe > GIGS): 3 at a time.
+  - Kill gigs, like 40 zombies or 10 creepers. Your Capri's kills count.
+  - Mine gigs: 40 ores or 64 logs.
+  - Bring gigs: redstone, iron, diamonds, gunpowder or cooked food.
+- **Chrome costs eddies**:
+  - The Sandevistan is free.
+  - The rest costs 150–600 €$. You buy each piece once, then install and remove it freely.
+- **Capri's combat upgrades are locked until bought**: Energy Ball, Brain Unplug, Glitch Dash, Mantis Blades, Monowire, Synapse Burnout, Orbital Laser and Tactical Nuke (200–600 €$). Everything else stays free.
+- **Cyberpsychosis meter**:
+  - It rises 8% per capacity of installed chrome, and goes up again each time you fire active chrome, cooling off over time.
+  - Over 70% you get episodes: nausea, a glitching screen and a worried Capri. Over 90%, darkness too.
+- **Sandevistan reworked**: no fog. The screen tints green and everything near you moves in slow motion (arrows drift, then fly on at full speed when it ends).
+- **CYBERWARE screen**: your character is shown with the game's own live player view, with a cyan hologram body behind it. The broken purple-and-black icons are fixed.
+- **Voice**: "call the ripperdoc", "any gigs", "how many eddies".
+
+### New in 1.7.2
+
+- **CYBERWARE** (Mainframe > CYBERWARE): your own chrome, 8 capacity. The screen has chrome to install on the left, your body in the middle on a holo ring, and installed chrome on the right. Works without Capri summoned.
+  - **Active** (sneak + use her chip, say it, or `/capri <cmd>`):
+    - Sandevistan (`sandy`, free): 8 s of slowed time. You speed up, mobs and arrows freeze, other players slow, green haze and after-images.
+    - Optical Camo (`camo`)
+    - Projectile Launch System (`rocket`): no block damage.
+    - Blood Pump (`bloodpump`)
+  - **Passive:**
+    - Kiroshi Vision Upgrade: a scan card for whatever you look at (health, passive/neutral/hostile, drops) plus a target box.
+    - Kerenzikov, Second Heart, Gorilla Arms, Reinforced Tendons (double jump) and Subdermal Armor.
+- **"Get lots of ___"**: she works out how to get it. Logs she chops, meat she hunts, crops she farms, mob drops she hunts the mob for (string means spiders) and sweeps up, blocks and ores she collects 64 of, anything else she crafts.
+- 2077-style menu polish: yellow corner brackets, red-and-yellow hover rows.
+- New sounds, particles and icons made in Blender.
+
+### New in 1.7.1
+
+- **Where did I die?** Ask her (or `/capri stuff`) and she guides you back: a trail of lights from you toward the spot, redrawn as you walk, the distance and direction on your screen, and a tall red beam with a ring over the spot. It lasts up to three minutes, or until you get there. Asking the way home works the same, with her usual beam.
+- **My words:** Mainframe > MY WORDS links any word or phrase, in any language, to one of her jobs. Say it to Capri on your PC, or type it in chat, and she does it. It helps when she doesn't understand a language, an accent or a stammer. Needs Capri X or the Capri Bedrock mod.
+- **Hack my friend:** with one other player online, "hack my friend" picks them; with more, she asks which one. Names said with spaces work too ("dark wolf" finds DarkWolf_99).
+- An icon, and the pack says it's made by .tob1s.
 
 ### New in 1.5
 
@@ -130,19 +157,20 @@ When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them:
 
 ### New in 1.4
 
-- **Effects rebuilt boss-fight style**: a new white particle sheet (mote, spark, ring, sigil, swirl, crack, shard, streak) tinted per effect, glow with `particles_add`, smoke with `particles_blend`, ground decals, stretched beams, spirals, and red-orange for danger (a colour she never uses otherwise).
-- **Animations polished**: anticipation before big moves, overshoot after, eased layered poses, a lagged ripple down her hair, and a cinematic spawn where she bursts out of the rift past full size.
+- **Effects rebuilt the vault's way** (Boss Guide: Particles and Fog): a new white particle sheet (mote, spark, ring, sigil, swirl, crack, shard, streak) tinted per effect, glow with `particles_add`, smoke with `particles_blend`, ground decals, stretched beams, spirals, and red-orange for danger (a colour she never uses otherwise).
+- **Animations polished the vault's way** (Model and Animation): anticipation before big moves, overshoot after, eased layered poses, a lagged ripple down her hair, and a cinematic spawn where she bursts out of the rift past full size.
 - **A slight glow over her whole body**, plus brighter neon accents.
 - **Orbital Laser** (`/capri laser`, and on its own against tough monsters, 45 s): a red-orange target sigil, then a pillar of pink light for 10 damage and fire, with a scorch mark and shockwave.
 - **Glitch Dash** (20 s): she chains through up to three monsters, 5 damage each, leaving a trail of light.
 - **Day and night** (`/capri day`, `/capri night`): a sun or moon sigil, a column of light, she spins, the sky changes.
 - **Teleport players** (`/capri tp <name>` takes you to them, `/capri bring <name>` brings them to you).
 
-### Tactical nuke
+### Tactical nuke (fake)
 
-A proper ultimate: a sigil opens under her, the blast zone is marked in red-orange, energy spirals and is sucked into the orb, the camera shakes harder and harder... then a white flash, a double ground shockwave, a column of light, a pink mushroom cloud and shards raining down.
+Rebuilt as a proper ultimate: a sigil opens under her, the 6-block blast zone is marked in red-orange, energy spirals and is sucked into the orb, the camera shakes harder and harder... then a white flash, a ground shockwave, a column of light, a pink mushroom cloud and shards raining down. The sound is still a tiny squeaky pop.
 
-When 4+ monsters swarm her (or on `/capri nuke`), she charges it over her head with red warning sparks. Since 1.7 it's real: every monster within 8 blocks takes up to 16 damage (more the closer they are), the close ones catch fire, and they're all blown back. You and other players are never hurt. 90-second cooldown.
+
+When 4+ monsters swarm her (or on `/capri nuke`), she raises a huge glowing orb over her head with red warning sparks and a dramatic charge-up... then it pops with a tiny squeak into a pink ring and confetti. Every monster within 6 blocks is blown back. Nothing takes damage. "TACTICAL NUCLEAR— pfft! HAHAHA! You should've seen your face!" 90-second cooldown.
 
 ### You touch, you get zapped (30 s cooldown)
 
@@ -155,17 +183,15 @@ Styled after the Capri X Mainframe: dark panels, red-pink headings, cyan for ON.
 - **Abilities**: a switch for each one: quickhacks, behind you, zap, brain unplug, nuke, emergency patch, mobs can target her, auto-loot, sleep with you, ride in your boat, idle dance, pranks, chatter, orbital laser, glitch dash, energy ball, all ten helpers, sitting and chest snooping. Saved per player.
 - **Skills**: everything she can do and every command.
 - **Jobs**: her job menu.
-- **Warp**: beam to her or a player, bring or send players, or warp to a biome.
-- **Sky**: day, night, rain, thunder or clear skies.
 - **Link**: how to let the Capri X app control her: turn on Minecraft in Capri X, turn on cheats, type `/connect localhost:19131` (turn off Require Encrypted Websockets if it won't connect).
 - **Backpack**: every stack she carries; tap to take.
-- **Craft**: recipes by kind (tools, armour, light and redstone, food, home, blocks), with a tick on what she can make now, or type anything.
-- **Status**: her health bar, every cooldown, your Mining Buddy ore count, her modes and any unfinished build.
+- **Craft**: one button per thing she can craft.
+- **Status**: every cooldown, your Mining Buddy ore count, her modes and any unfinished build.
 - **Summon / Recall**.
 
 ### Other notes
 
-- She has 100 health, shown as a bar over her head, and monsters target and attack her like a player (switch that off in the chip). Out of combat she regenerates 2 health every 4 seconds. Redstone heals her (dust +10, a block fills her up), and so do cookies, berries and cake. If she dies she reboots.
+- She has 20 health like a player, and monsters target and attack her like a player (switch that off in the chip). Out of combat she regenerates 1 health every 4 seconds. If she dies she reboots.
 - Players can't hurt her, so there's no friendly fire.
 - She takes no fall, suffocation or drowning damage.
 - When idle she flickers and glitches, sometimes hops a couple of blocks, and chats every 4–8 minutes.
@@ -175,7 +201,7 @@ Styled after the Capri X Mainframe: dark panels, red-pink headings, cyan for ON.
 | Command | Does |
 |---|---|
 | `/capri help` | Lists everything she can do, in chat. |
-| `/capri <job>` | Any job above: `wood`, `mine`, `farm`, `build hut`, `clear`, `light`, `scan`, `guard`, `boost`, `pickup`, `cook`, `store`, `give`, `bag`, `helper`, `dance`, `hack`, `unplug`, `nuke`, `threats`, `laser`, `ball`, `craft <item>`, `hunt`, `collect <block>`, `stuff`, `day`, `night`, `rain`, `thunder`, `sunny`, `tp <name|capri>`, `bring <name>`, `send <name> <name|capri>`, `biome <name>`, `boat`, `sleep`, `wake`, `sethome`, `home`, `chip`, `stay`, `follow`, `recall`, `stop`, `summon`. |
+| `/capri <job>` | Any job above: `wood`, `mine`, `farm`, `build hut`, `clear`, `light`, `scan`, `guard`, `boost`, `pickup`, `cook`, `store`, `give`, `bag`, `helper`, `dance`, `hack`, `unplug`, `nuke`, `threats`, `laser`, `ball`, `craft <item>`, `stuff`, `day`, `night`, `tp <name>`, `bring <name>`, `boat`, `sleep`, `wake`, `sethome`, `home`, `chip`, `stay`, `follow`, `recall`, `stop`, `summon`. |
 | `/function capri/summon` | Call her. If she already exists, recalls her instead. |
 | `/function capri/recall` | Blink her to you and set her to follow. |
 | `/function capri/stay`, `capri/follow` | Same as tapping her. |
@@ -183,6 +209,33 @@ Styled after the Capri X Mainframe: dark panels, red-pink headings, cyan for ON.
 | `/function capri/help` | Lists all of this in chat. |
 | `/scriptevent capri:say <text>` | She says `<text>` in chat. This is the hook for the Capri X desktop app bridge. |
 
-## Licence
+## Rebuilding
 
-The Capri Companion add-on is not open source. Copyright 2026 tob7as, all rights reserved: you may download it and play it, but not copy, change, re-upload or share its files. Capri's character and art belong to Lachy and her artist (see the [main page](../README.md#credit)).
+Blender 5.2 runs the model generator. The other tools are plain Python.
+
+```bash
+powershell -File tools/preview.ps1
+```
+
+That rebuilds `build_model.py` and renders `previews/sheet.png`.
+
+- `python tools/build_anims.py` writes the animations, controller, particles and particle texture.
+- `python tools/validate.py` runs the static checks.
+- `python tools/package.py` writes `dist/*.mcpack` and `*.mcaddon`.
+- `tests/harness.html` runs the script against a mocked `@minecraft/server`. Serve the project folder with `python -m http.server 8765`, then open `http://localhost:8765/tests/harness.html`.
+
+## Testing status (honest)
+
+**Checked:**
+- `validate.py` passes: JSON, wiring, every Molang property read, UVs, events, particles, pose ids and lengths, manifests.
+- The mocked-script harness passes all 134 checks, two runs in a row, including (new in 1.5) help mode only with the chip in hand, no fog, the energy ball, any item into her backpack and the backpack page, crafting a pickaxe and a crafting table, resuming a hut, the ore sniffer glow, the diamond celebration, creeper detector, tiny bodyguard, inventory, food and sleep warnings, the pocket torch, where's my stuff, the home beacon, sitting on a crafting table and judging a chest of dirt; (new in 1.4) the full nuke sequence with camera shake and flash, the orbital laser, glitch dash, day and night, and teleporting players, and (new in 1.3) the chip on first join with keep-on-death, the Mainframe, its Link page and ability switches, zap with its cooldown, brain unplug, the nuke's no-damage knockback, threat scan, home, sleeping and waking with you, boats, the idle dance stopping when looked at, regeneration and a house with a log frame, glass windows and a torch. Before 1.3 it already passed 67 checks, several runs in a row, including chopping, mining with an ore vein, building, help mode, handing over blocks, the job menu, app commands, `/capri` and `/capri help`, farming with replanting, torches, the ore scan, cooking, storing in a chest, loot pickup, overclock, clearing, dancing and guard duty. It covers summon, binding, egg claim, leash blink, quickhacks, blink-strike, creeper handling, healing, stay/follow, stranger taps, the `say` bridge, death and reboot, idle glitches and chat, and zero script warnings.
+- Model and poses were checked in Blender renders.
+
+**Not yet checked in a real Minecraft client.** Please turn on **Settings → Creator → Content Log** and look for:
+
+1. Any red errors in the Content Log (components, sounds, particles, script).
+2. Whether the new hologram model, its glow (meant to be subtle) and the chip icon look right, and whether the particles (rift, fragments, orb, confetti, bolt, notes, Z's) show.
+3. Whether the chip's use opens the Mainframe (custom items fire the use event without extra components on current versions, but this is the bit most likely to need a tweak), and whether mobs really go for her and she fits in a boat.
+4. Whether follow, stay and the teleport-to-owner behaviour feel good.
+5. Whether quickhacks, blink-strikes and healing fire, and whether the balance is too strong or too weak.
+6. Whether the chat lines appear, and whether there are too many or too few.
