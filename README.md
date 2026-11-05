@@ -66,7 +66,7 @@ Code mods are Windows only for now. Port 19131 busy? Change it in `settings.txt`
 - **Fights for you:** kill orders, protect mode, mantis blades, monowire, synapse burnout, energy ball, orbital laser and a real tactical nuke.
 - **Cyberware for you:** Sandevistan slow-mo, optical camo, Kerenzikov, double jump, a second heart and more, installed by **Kaz the ripperdoc**, who visits your world every 10 to 15 minutes.
 - **Eddies and gigs:** earn €$ from 57 gigs (kill, mine, bring and courier jobs), plus rare **Max-Tac bounties** for the Warden, the Wither and the Ender Dragon. Spend them on chrome, Capri's upgrades and new builds.
-- **Builds:** a hut, house, tower, bridge, wall and more from her backpack, plus paid plans that bring their own materials: **Neon Gate**, **AV Landing Pad**, **Netrunner Safehouse**, **Neon Tower** and the huge **Megabuilding**.
+- **Builds:** a hut, house, tower, bridge, wall and more from her backpack, plus paid plans that bring their own materials: **Neon Gate**, **AV Landing Pad**, **Netrunner Safehouse** and **Neon Tower**.
 - **Cyberpsychosis:** too much chrome and your screen starts to glitch. Kaz sells immunosuppressants.
 - **With the mod:** she says her game lines out loud, calls out danger (creepers, swarms, low health), greets your friends when they join, and holds a grudge against whatever killed you until you take it down.
 

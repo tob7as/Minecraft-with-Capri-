@@ -8,7 +8,7 @@ Made by .tob1s.
 
 ## Install
 
-1. Double-click `Capri_Companion_v1.7.6.mcaddon` (from the [download](../download/) folder). Minecraft imports both packs.
+1. Double-click `dist/Capri_Companion_v1.5.0.mcaddon`. Minecraft imports both packs.
 2. Open a world, go to **Edit → Behavior Packs**, and activate **Capri Companion | Behavior**. The resource pack comes along with it.
 3. Join the world and type `/capri summon`, or use the **Spawn Capri** egg from the creative inventory. She tears in through a neon-pink rift.
 4. The first time you join, you get **Capri's Neural Chip**. Use it (right-click / hold) to open her Mainframe. It stays in your inventory when you die. Lost it? `/capri chip`.
@@ -84,12 +84,16 @@ When a monster is 4–13 blocks away, she breaks into pink and green fragments (
 
 When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them: green static, floating question marks and a glitched note-block tune, and they spin and stagger about with Slowness and Weakness for 4 seconds. "Oops! I unplugged their braincells!" Bedrock's scripting can't wipe a mob's target, so this works by making them spin and wander rather than truly forgetting you.
 
+### New in 1.7.7
+- **The Megabuilding is gone** from the BUILD page. The other paid plans stay.
+- **Sandevistan fixes**: no more box in the middle of the screen, the green tint goes away when it ends, and the after-images are shaped like a player.
+
 ### New in 1.7.6
 - **Free eddies in creative mode**: `/function capri/give_eddies` gives you 1000 €$. Want a different amount? `/scriptevent capri:give_eddies 5000` (up to a million at a time). It only works in creative mode: in survival, Capri tells you to go do some gigs.
 
 ### New in 1.7.5
-- **Megabuilding** (3000 €$ on the BUILD page): a huge cyberpunk megabuilding, 78 x 137 and 195 blocks tall, about 190,000 blocks. Capri raises it in front of you a layer at a time in about a minute, clearing the ground inside as she goes. Stop her and ask again and she carries on where she left off. Build it below y 125 so it fits under the sky limit.
-- **Paid builds bring their own materials**: the Neon Tower, Safehouse, Landing Pad, Neon Gate and Megabuilding need nothing from her backpack. She builds them with the right blocks (blackstone, deepslate, concrete, blue glass, pearlescent froglight neon) and three times faster.
+- **Megabuilding** (3000 €$, removed in 1.7.7): a huge cyberpunk megabuilding, built with fill boxes a layer at a time.
+- **Paid builds bring their own materials**: the Neon Tower, Safehouse, Landing Pad and Neon Gate need nothing from her backpack. She builds them with the right blocks (blackstone, deepslate, concrete, blue glass, pearlescent froglight neon) and three times faster.
 
 ### New in 1.7.4
 - **Lots more gigs**: 57 now. New monster bounties (witches, blazes, ghasts, phantoms, raiders, guardians, shulkers, the Nether...), mining gigs (stone, sand, diamond ore, ancient debris, quartz, obsidian) and hand-ins (ender pearls, blaze rods, emeralds, gold, wool, ghast tears, netherite scrap and more).
