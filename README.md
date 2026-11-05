@@ -1,5 +1,9 @@
 # Capri for Minecraft
 
+<p align="center">
+  <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/latest"><img src="https://img.shields.io/github/downloads/tob7as/Minecraft-with-Capri-/total?label=downloads&style=for-the-badge&color=05d9e8" alt="Total downloads"></a>
+</p>
+
 **Capri, the neon netrunner AI, as your companion in Minecraft Bedrock.** She follows you, fights for you, mines, builds, crafts and talks. With the **Capri Bedrock mod** for [Lachy's Capri](https://github.com/lachydotmcg/capri-desktop), you can talk to her out loud and her body in the game does it.
 
 For custom add-ons or commissions, add me on Discord: **@.tob1s**
@@ -9,10 +13,6 @@ Also check out **AdemDEV** for commissions! <https://github.com/AdemonG1tHub>
 ---
 
 ## ⬇️ Download
-
-<p align="center">
-  <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/latest"><img src="https://img.shields.io/github/downloads/tob7as/Minecraft-with-Capri-/total?label=downloads&style=for-the-badge&color=05d9e8" alt="Total downloads"></a>
-</p>
 
 <p align="center">
   <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.6/Capri_Companion_v1.7.6.mcaddon"><img src="https://img.shields.io/badge/Download-Minecraft%20Add--on%20v1.7.6-ff2a6d?style=for-the-badge&logo=minecraft&logoColor=white" alt="Download the Minecraft add-on" height="48"></a>
