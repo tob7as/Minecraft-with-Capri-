@@ -10,13 +10,25 @@ Also check out **AdemDEV** for commissions! <https://github.com/AdemonG1tHub>
 
 ## ⬇️ Download
 
+<p align="center">
+  <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/latest"><img src="https://img.shields.io/github/downloads/tob7as/Minecraft-with-Capri-/total?label=downloads&style=for-the-badge&color=05d9e8" alt="Total downloads"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.5/Capri_Companion_v1.7.5.mcaddon"><img src="https://img.shields.io/badge/Download-Minecraft%20Add--on%20v1.7.5-ff2a6d?style=for-the-badge&logo=minecraft&logoColor=white" alt="Download the Minecraft add-on" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.5/capri-bedrock.capri-code"><img src="https://img.shields.io/badge/Download-Capri%20Bedrock%20Mod-b14aed?style=for-the-badge&logo=windows&logoColor=white" alt="Download the Capri Bedrock mod" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/lachydotmcg/capri-desktop"><img src="https://img.shields.io/badge/Get-Lachy's%20Capri-05d9e8?style=for-the-badge&logo=github&logoColor=white" alt="Get Lachy's Capri" height="48"></a>
+</p>
+
 | What | Download | |
 |---|---|---|
-| **Minecraft add-on** (v1.7.5) | [**Capri_Companion_v1.7.5.mcaddon**](https://github.com/tob7as/Minecraft-with-Capri-/raw/main/download/Capri_Companion_v1.7.5.mcaddon) | Double-click it, Minecraft imports it |
-| **Capri Bedrock mod** | [**capri-bedrock.capri-code**](https://github.com/tob7as/Minecraft-with-Capri-/blob/main/download/capri-bedrock.capri-code) | Press the **Download raw file** button on that page |
+| **Minecraft add-on** (v1.7.5) | [**Capri_Companion_v1.7.5.mcaddon**](https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.5/Capri_Companion_v1.7.5.mcaddon) | Double-click it, Minecraft imports it |
+| **Capri Bedrock mod** | [**capri-bedrock.capri-code**](https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.5/capri-bedrock.capri-code) | Import it in Lachy's Capri (Setup, step 2) |
 | **Capri** (the desktop app, by Lachy) | [**lachydotmcg/capri-desktop**](https://github.com/lachydotmcg/capri-desktop) | Get **Capri-Setup.exe** from his page |
 
-The add-on works on its own. The mod and Lachy's Capri are only needed if you want to talk to her with your voice.
+Click a button and the download starts. The add-on works on its own: the mod and Lachy's Capri are only needed if you want to talk to her with your voice.
 
 ## 🛠️ Setup
 
@@ -32,7 +44,7 @@ Needs Minecraft Bedrock 1.26.50 or newer. `/capri` works without cheats.
 ### 2. Talk to her: the mod for Lachy's Capri
 
 1. Install **Capri** from Lachy's GitHub: **<https://github.com/lachydotmcg/capri-desktop>** (download **Capri-Setup.exe** and run it, then set her up as his page says).
-2. Download **[capri-bedrock.capri-code](https://github.com/tob7as/Minecraft-with-Capri-/blob/main/download/capri-bedrock.capri-code)** (press **Download raw file**).
+2. Download **[capri-bedrock.capri-code](https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.7.5/capri-bedrock.capri-code)** with the **Capri Bedrock Mod** button above.
 3. In Capri, open the **Mainframe** and press **Mods** (in the CAPRI band).
 4. Press **Import mod** and pick the `capri-bedrock.capri-code` file you downloaded.
 5. It's a code mod, so Capri asks before it runs. Say **yes**. Make sure it's switched on in the Mods list.
