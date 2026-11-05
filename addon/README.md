@@ -84,6 +84,20 @@ When a monster is 4–13 blocks away, she breaks into pink and green fragments (
 
 When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them: green static, floating question marks and a glitched note-block tune, and they spin and stagger about with Slowness and Weakness for 4 seconds. "Oops! I unplugged their braincells!" Bedrock's scripting can't wipe a mob's target, so this works by making them spin and wander rather than truly forgetting you.
 
+### New in 1.7.8
+- **CREW board** (Mainframe > CREW, or `/capri crew`): a dossier on everyone in the world: online or when they were last seen, their eddies, gigs done, last death and nickname. Buttons for everything below.
+- **Reboot Optics** quickhack: a friend's screen goes dark with static for 3 seconds. `/capri optics <player>` (45 s cooldown, never yourself).
+- **Eddie skim**: Capri "borrows" 5 €$ from a friend and gives it back 6 seconds later: "relax, it's a prank, choom". Opt-in only: each player turns it on for themself with `/capri pranks on` or on the CREW board. If they log off mid-prank, they get it back when they rejoin.
+- **Jealous Capri**: if a friend stands right next to you for 8 seconds, she squeezes in between and side-eyes them (3 min cooldown). Switch it off in ABILITIES.
+- **Holocall**: "Capri, tell Sam to come to my base". The message pops up on their screen with a holo-call sound (and their Capri reads it out if they have the mod). `/capri holocall "sam come to my base"`, or `everyone` for the whole crew.
+- **Send eddies**: pay a friend from the CREW board or with `/capri pay "sam 50"`.
+- **Nicknames and greetings**: Capri says hi when someone joins, using their nickname. Set one with `/capri nickname "sam the legend"`, or let her give them one: die to creepers three times and you're "the creeper magnet". Others: gravity's favourite, the fish, the human torch, the pincushion, the gig machine, the walking ATM...
+- **Underground Base** (700 €$, first on the BUILD page and Kaz's BUILD PLANS): a neon doorway, steps down into the ground, a 13 x 11 hall with neon in the ceiling, and a vault at the back. She digs it out herself and brings every block. She never digs out chests, spawners, bedrock or portals.
+- **X-ray ore scan**: after a scan, every ore she found (the 40 nearest) gets a coloured tag like **◆ DIAMOND** or **◆ GOLD** that shows through the stone for 15 seconds.
+- **Pick where builds go**: builds and the 7x7 clear go on the block you look at, up to 48 blocks away. Look at the sky and they go in front of you like before.
+- **Don't hit Capri**: if a friend hits her, she gets mad, yells at them, shoves them back and tells you. Three hits in a minute and their optics get rebooted. If you hit her, she's just hurt.
+- **She says things differently**: every one of these lines has several versions, and she never says the same one twice in a row.
+
 ### New in 1.7.7
 - **The Megabuilding is gone** from the BUILD page. The other paid plans stay.
 - **Sandevistan fixes**: no more box in the middle of the screen, the green tint goes away when it ends, and the after-images are shaped like a player.

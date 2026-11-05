@@ -231,6 +231,18 @@ public class CapriBedrock : ICapriMod
             { @"\b(stop|cancel|quit)\b.{0,20}\b(mining|chopping|building|digging|working|fighting|farming|clearing|dancing|guarding|the job|that job)\b|\bstop (it|that)\b|\b(stop|cancel|quit|abort)\W*$|\b(stop|cancel) (it|that|what you'?re doing|everything|the job)\W*$|\bnever ?mind\W*$|\bforget it\W*$|\bthat'?s enough\W*$", "stop", "", "stopping the job your body was doing", "" },
             { @"\bwhat (can|else can) you do (in|on) (the game|minecraft)\b|\b(minecraft|in-game|game) (commands|jobs|abilities)\b|\bcapri help\b|\bwhat are your (minecraft |in-game )?(commands|jobs)\b|\bwhat commands\b|\bshow (me )?(your |the )?(commands|skills|abilities)\b|\b(list|tell me) (your |the )?(commands|skills)\b", "help", "", "showing them the list of everything you can do in the game, in chat", "" },
             { @"\b(protect|guard|defend|cover|save|shield) me\b|\bkeep me safe\b|\b(be my|act as my) bodyguard\b|\bbodyguard mode\b|\bhelp me fight\b|\bi need (your )?(help|backup)\b.{0,25}\b(mobs?|monsters?|fight|zombies?|attack(ed|ing)?)\b|\b(watch|cover|got) my back\b|\bi'?m (being |getting )?(attacked|chased)\b|\bhelp me\W*$|\bsave me\b", "protect", "", "sticking right by them for two minutes as their bodyguard, shielding them and fighting anything that comes for them", "protecting them" },
+            { @"\b(reboot|crash|fry|hack|glitch|scramble|black ?out|blind|mess with)\b (?<who>[a-z0-9_]{2,16})(?:'s|s)? (optics|eyes|vision|screen|sight)\b", "optics", "${who}", "quickhacking that friend's optics: their screen goes dark with static for 3 seconds, a harmless prank", "" },
+            { @"\b(reboot|crash|fry|hack|glitch|scramble|black ?out)\b (?:the )?(optics|eyes|vision|screen|sight) of (?<who>[a-z0-9_]{2,16})\b", "optics", "${who}", "quickhacking that friend's optics: their screen goes dark with static for 3 seconds, a harmless prank", "" },
+            { @"\b(blind|blindfold)\b (?:the player |player )?" + NotAName + @"(?<who>[a-z0-9_]{2,16})\b", "optics", "${who}", "quickhacking that friend's optics: their screen goes dark with static for 3 seconds, a harmless prank", "" },
+            { @"\b(skim|steal|swipe|pickpocket|rob|nick|yoink|take|borrow)\b (?:some |a few |a bit of |\d+ )?(?:eddies|eddie|eds|euro ?dollars|money|bucks|coins|cash) (?:off|from|of|outta) (?<who>[a-z0-9_]{2,16})\b", "skim", "${who}", "skimming 5 eddies off that friend as a prank (only if they opted in), and giving them back 6 seconds later", "" },
+            { @"\b(rob|pickpocket|skim|yoink|mug)\b (?:the player |player )?" + NotAName + @"(?<who>[a-z0-9_]{2,16})\b", "skim", "${who}", "skimming 5 eddies off that friend as a prank (only if they opted in), and giving them back 6 seconds later", "" },
+            { @"\b(pay|send|give|transfer|wire|tip)\b (?<who>[a-z0-9_]{2,16}) (?<n>\d+) (?:eddies|eddie|eds|euro ?dollars|money|bucks|coins|cash)?", "pay", "${who} ${n}", "sending that many of their eddies to that friend", "" },
+            { @"\b(pay|send|give|transfer|wire|tip)\b (?<n>\d+) (?:eddies|eddie|eds|euro ?dollars|money|bucks|coins|cash) to (?<who>[a-z0-9_]{2,16})\b", "pay", "${who} ${n}", "sending that many of their eddies to that friend", "" },
+            { @"\b(tell|message|text|ping|holocall|holo ?call|let)\b (?!(?:me|us|you|yourself|him|her|them|it|a|an|the|about|what|how|why|when|if|go|there|this|that|my|your|everything)\b)(?<who>everyone|everybody|the crew|[a-z0-9_]{2,16}) (?:know )?(?:to |that |: ?)?(?<msg>.{2,120})$", "holocall", "${who} ${msg}", "sending that message to that friend's screen as a holocall", "" },
+            { @"\b(open|show|pull up|check)\b.{0,15}\b(crew|squad|friends?)\b ?(board|page|list|files|dossiers?)\b|^crew( board)?$", "crew", "", "opening the CREW board: who's online, their eddies, gigs, last death, plus pranks and holocalls", "" },
+            { @"\b(turn|switch|put)\b (?<on>on|off) (?:my )?(?:eddie |money )?pranks\b|\b(?:eddie |money )?pranks (?<on>on|off)\b", "pranks", "${on}", "switching whether friends can skim their eddies as a prank", "" },
+            { @"\b(nickname|call|name)\b (?<who>[a-z0-9_]{2,16}) (?:as )?(?<nick>the [a-z' ]{2,30})$", "nickname", "${who} ${nick}", "giving that player a nickname she'll greet them with", "" },
+            { @"\b(build|make|dig)\b.{0,30}\b(underground (base|bunker|lair|hideout|hq)|bunker|secret (base|lair|hideout)|base underground)\b", "build", "underground", "going to dig and build the Underground Base: steps down to a neon hall and a vault, with her own materials (a plan they buy on the BUILD page)", "" },
             { @"\b(hack|hijack|possess|puppet|control|mind ?control|take over)\b (?:my |our |the )?(?<who>friend|buddy|mate|bro|homie|pal)\b", "hack", "${who}", "jacking into that player's nervous system and steering them around for 20 seconds, a harmless prank", "" },
             { @"\b(hack|hijack|possess|puppet|control|mind ?control|take over)\b (?:the player |player |into |in to )?" + NotAName + @"(?<who>[a-z0-9_]{2,16}(?: [a-z0-9_]{2,16}(?=\W*$))?)\b", "hack", "${who}", "jacking into that player's nervous system and steering them around for 20 seconds, a harmless prank", "" },
             { @"\bemp\b|\belectromagnetic (pulse|blast)\b|\bfry (their|the) circuits\b", "emp", "", "firing an EMP blast that fries every monster within 10 blocks", "" },
@@ -320,6 +332,13 @@ public class CapriBedrock : ICapriMod
             { "rocket", new[] { "missile away!!", "launching! cover your ears", "boom incoming" } },
             { "bloodpump", new[] { "blood pump kicking in, hold on", "patching you up, choom", "heal juice incoming" } },
             { "ripperdoc", new[] { "pinging Kaz...", "calling the doc", "one sec, checking where Kaz is" } },
+            { "optics", new[] { "quickhack loaded. reboot optics, go", "lights out for them hehe", "frying their optics, one sec", "sending static to their eyes ✦" } },
+            { "skim", new[] { "skimming their wallet, shh", "borrowing some eddies, don't tell", "wire transfer incoming hehe", "yoink. temporarily" } },
+            { "pay", new[] { "sending the eddies", "wiring it now ✦", "transfer going through", "paying them, generous choom" } },
+            { "holocall", new[] { "ringing them now", "holocall going out ✦", "beaming your message over", "passing it on" } },
+            { "crew", new[] { "crew files, coming up", "opening the dossiers", "here's your crew ✦" } },
+            { "pranks", new[] { "updating your prank settings", "got it, pranks switched", "done ✦" } },
+            { "nickname", new[] { "noted. new name in my files", "ooh, love it", "saving that nickname ✦" } },
             { "gigs", new[] { "fixer's board, coming up", "let's see what pays", "gigs! money time" } },
             { "eddies", new[] { "checking your wallet", "counting your eddies", "one sec, wallet check" } },
             { "collect", new[] { "collecting {0} for you now!", "on it, grabbing {0}!", "{0}? filling my backpack now", "collecting that for you now!", "on it, filling my backpack!", "gathering it up, one sec" } },
@@ -535,6 +554,7 @@ public class CapriBedrock : ICapriMod
                 if (friends.ContainsKey(text)) Speak("bye " + text + "! come back soon", true);
                 break;
             case "capri_died": Speak("ow ow ow. rebooting... remember who did that", true); break;
+            case "holocall": Speak(new[] { "incoming holocall! ", "holocall for you. ", "ring ring, choom. ", "message from the crew. " }[random.Next(4)] + text, false); break;
         }
     }
 
