@@ -73,9 +73,6 @@ Everything, with every command, is in **[addon/README.md](addon/README.md)**.
 
 <img src="images/builds.png" alt="The Neon Gate, AV Landing Pad, Netrunner Safehouse and Neon Tower" width="800">
 
-<img src="images/megabuilding.png" alt="The Megabuilding: a 195 block tall cyberpunk tower" width="400">
-
-The **Megabuilding** is 195 blocks tall and about 190,000 blocks. Capri raises it in front of you a layer at a time in about a minute.
 
 ## 🎬 See her in action
 
