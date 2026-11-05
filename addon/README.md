@@ -8,7 +8,7 @@ Made by .tob1s.
 
 ## Install
 
-1. Double-click `Capri_Companion_v1.7.5.mcaddon` (from the [download](../download/) folder). Minecraft imports both packs.
+1. Double-click `Capri_Companion_v1.7.6.mcaddon` (from the [download](../download/) folder). Minecraft imports both packs.
 2. Open a world, go to **Edit → Behavior Packs**, and activate **Capri Companion | Behavior**. The resource pack comes along with it.
 3. Join the world and type `/capri summon`, or use the **Spawn Capri** egg from the creative inventory. She tears in through a neon-pink rift.
 4. The first time you join, you get **Capri's Neural Chip**. Use it (right-click / hold) to open her Mainframe. It stays in your inventory when you die. Lost it? `/capri chip`.
@@ -83,6 +83,9 @@ When a monster is 4–13 blocks away, she breaks into pink and green fragments (
 ### Brain unplug
 
 When 3+ monsters close in (or on `/capri unplug`), she hacks up to five of them: green static, floating question marks and a glitched note-block tune, and they spin and stagger about with Slowness and Weakness for 4 seconds. "Oops! I unplugged their braincells!" Bedrock's scripting can't wipe a mob's target, so this works by making them spin and wander rather than truly forgetting you.
+
+### New in 1.7.6
+- **Free eddies in creative mode**: `/function capri/give_eddies` gives you 1000 €$. Want a different amount? `/scriptevent capri:give_eddies 5000` (up to a million at a time). It only works in creative mode: in survival, Capri tells you to go do some gigs.
 
 ### New in 1.7.5
 - **Megabuilding** (3000 €$ on the BUILD page): a huge cyberpunk megabuilding, 78 x 137 and 195 blocks tall, about 190,000 blocks. Capri raises it in front of you a layer at a time in about a minute, clearing the ground inside as she goes. Stop her and ask again and she carries on where she left off. Build it below y 125 so it fits under the sky limit.
