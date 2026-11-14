@@ -6,9 +6,9 @@
 
 **Capri, the neon netrunner AI, as your companion in Minecraft Bedrock.** She follows you, fights for you, mines, builds, crafts and talks. With the **Capri Bedrock mod** for [Lachy's Capri](https://github.com/lachydotmcg/capri-desktop), you can talk to her out loud and her body in the game does it.
 
-For custom add-ons or commissions, add me on Discord: **@.tob1s**
+For custom add-ons or **commissions**, add me on Discord: **@.tob1s**
 
-Also check out **AdemDEV** for commissions! <https://github.com/AdemonG1tHub>
+Also check out **AdemDEV** for **commissions!** <https://github.com/AdemonG1tHub>
 
 ---
 
