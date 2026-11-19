@@ -14,6 +14,8 @@ Also check out **AdemDEV** for **commissions!** <https://github.com/AdemonG1tHub
 
 ## ⬇️ Download
 
+# Just download the mod - add it to capri mods - 
+# Just download the addon - put it into your world and type /connect localhost:19131
 <p align="center">
   <a href="https://github.com/tob7as/Minecraft-with-Capri-/releases/download/v1.8.0/Capri_Companion_v1.8.0.mcaddon"><img src="https://img.shields.io/badge/Download-Minecraft%20Add--on%20v1.8.0-ff2a6d?style=for-the-badge&logo=minecraft&logoColor=white" alt="Download the Minecraft add-on" height="48"></a>
   &nbsp;
